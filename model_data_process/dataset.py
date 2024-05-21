@@ -68,10 +68,10 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param idx: index
         :return:
         """
-        history, label = self.data[idx]['history'], self.data[idx]['label']
+        history, label, emotion_label = self.data[idx]['history'], self.data[idx]['label'], self.data[idx]['context']
         if self.transform:
             return self.transform((history, label))
-        return history, label
+        return history, label, emotion_label
 
     def __len__(self) -> int:
         """
