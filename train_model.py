@@ -37,7 +37,7 @@ class TrainInterface(BaseInterface):
             'help': ' The evaluation strategy to adopt during training.',
             'choices': ['steps', 'epoch', 'no'],
             'required': False,
-            'default': 'steps'
+            'default': 'epoch'
         },
         'eval_steps': {
             'help': 'Number of update steps between two evaluations if evaluation_strategy="steps"',
@@ -58,7 +58,7 @@ class TrainInterface(BaseInterface):
             'help': 'The checkpoint save strategy to adopt during training.',
             'choices': ['steps', 'epoch', 'no'],
             'required': False,
-            'default': 'steps'
+            'default': 'epoch'
         },
 
         'load_best_model_at_end': {
