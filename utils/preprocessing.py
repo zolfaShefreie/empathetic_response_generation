@@ -72,7 +72,7 @@ class NewVersionDialogues:
                 merged_result[key_name] = current_conv.get(key_name, list()) + [record.get(key_name, None)]
 
             merged_result[self.context_key_name] = current_conv.get(self.context_key_name, list()) + \
-                                                  [record.get(self.utter_key_name, None)]
+                                                   [record.get(self.utter_key_name, None)]
 
         else:
             for key_name in self.other_utter_features:
@@ -202,16 +202,19 @@ class TextCleaner:
         :param sample:
         :return:
         """
-        texts = sample[0][0] if self.have_label else sample[0]
+        # texts = sample[0][0] if self.have_label else sample[0]
+        texts = sample[0]
 
         # value of each (row, col) can be list type or str type
         cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
             else self._clean_single_text(texts)
 
         if self.have_label:
-            return np.array([cleaned_result]), np.array(sample[-1])
+            return np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
+                       else np.array([cleaned_result]), np.array(sample[-1])
         else:
-            return np.array([cleaned_result])
+            return np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
+                else np.array([cleaned_result])
 
 
 class ConversationFormatter:
@@ -260,9 +263,10 @@ class ConversationTokenizer:
         :param new_special_tokens:
         """
         self.tokenizer = tokenizer
+        self.tokenizer.truncation_side = 'left'
 
         if new_special_tokens:
-            tokenizer.add_special_tokens(new_special_tokens)
+            self.tokenizer.add_special_tokens(new_special_tokens)
 
         self.train_split = train_split
         self.MAX_LEN = max_len
@@ -272,8 +276,7 @@ class ConversationTokenizer:
         :param sample: get context, last_utter and response (response is optional)
         :return:
         """
-
-        inputs = self.tokenizer.encode_plus((sample[0][0], sample[1][0]),
+        inputs = self.tokenizer.encode_plus(sample[0][0], sample[1][0],
                                             add_special_tokens=True,
                                             max_length=self.MAX_LEN,
                                             padding='max_length',
@@ -312,10 +315,9 @@ class ConvertInputToDict:
         :return:
         """
         return {key: sample[index] for key, index in self.dict_meta_data.items()}
-    
+
 
 class PreProcessEncoderDecoderInput:
-
     # it is coded based on output of ConversationTokenizer class
     OUTPUT_KEYS = {'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
                    'decoder_input_ids': 3, 'decoder_attention_mask': 4, 'labels': 3}

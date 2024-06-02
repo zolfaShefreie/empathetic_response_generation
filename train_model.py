@@ -37,7 +37,7 @@ class TrainInterface(BaseInterface):
             'help': ' The evaluation strategy to adopt during training.',
             'choices': ['steps', 'epoch', 'no'],
             'required': False,
-            'default': 'steps'
+            'default': 'epoch'
         },
         'eval_steps': {
             'help': 'Number of update steps between two evaluations if evaluation_strategy="steps"',
@@ -58,7 +58,7 @@ class TrainInterface(BaseInterface):
             'help': 'The checkpoint save strategy to adopt during training.',
             'choices': ['steps', 'epoch', 'no'],
             'required': False,
-            'default': 'steps'
+            'default': 'epoch'
         },
 
         'load_best_model_at_end': {
@@ -119,7 +119,8 @@ class TrainInterface(BaseInterface):
 
     MODELS = {
         models.ModelType.roberta_shared.name: models.RobertaShared,
-        models.ModelType.roberta_gpt2.name: models.Roberta2GPT2
+        models.ModelType.roberta_gpt2.name: models.Roberta2GPT2,
+        models.ModelType.roberta_dialogpt.name: models.Roberta2DialoGPT
     }
 
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
@@ -159,6 +160,7 @@ class TrainInterface(BaseInterface):
             do_train=True,
             do_eval=True,
             learning_rate=self.learning_rate,
+            lr_scheduler_type='constant',
             save_strategy=self.save_strategy,
             per_device_train_batch_size=self.per_device_train_batch_size,
             per_device_eval_batch_size=self.per_device_eval_batch_size,

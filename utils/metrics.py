@@ -8,7 +8,9 @@ class Metrics:
     PPL = evaluate.load("perplexity", module_type="metric")
     BLEURT = evaluate.load("bleurt", module_type="metric")
     ROUGE = evaluate.load('rouge')
+    BLEU = evaluate.load("bleu")
     ACCURACY = evaluate.load('accuracy')
+    MAX_ORDER = 4
 
     def __init__(self, tokenizer, decoder_name: str = "gpt2"):
         self.tokenizer = tokenizer
@@ -67,7 +69,8 @@ class Metrics:
 
         # metrics using token version
         result.update(self.ROUGE.compute(predictions=pred_str, references=label_str))
-        result.update(self.PPL.compute(predictions=pred_str, model_id=self.decoder_id))
+        result['mean_perplexity'] = self.PPL.compute(predictions=pred_str, model_id=self.decoder_id)['mean_perplexity']
+        result['bleu'] = self.BLEU.compute(predictions=pred_str, references=label_str, max_order=self.MAX_ORDER)['bleu']
         result['bluert_score'] = self.BLEURT.compute(predictions=pred_str, references=label_str)['scores']
         result.update(self.distinct(seqs=pred_str))
 

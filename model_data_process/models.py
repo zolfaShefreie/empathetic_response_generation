@@ -7,6 +7,7 @@ import enum
 class ModelType(enum.Enum):
     roberta_shared = 'roberta_shared'
     roberta_gpt2 = 'roberta_gpt2'
+    roberta_dialogpt = 'roberta_dialogpt'
 
 
 class RobertaShared(EncoderDecoderModel, ABC):
@@ -109,6 +110,7 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
         config.num_beams = 4
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
+
 
 class Roberta2DialoGPT(EncoderDecoderModel, ABC):
     """
