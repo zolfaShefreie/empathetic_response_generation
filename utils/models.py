@@ -27,7 +27,7 @@ class MultiTaskModel(PreTrainedModel):
         self._validate_task_config()
 
     @abc.abstractmethod
-    def initial_models(self, **kwargs) -> dict():
+    def initial_models(self, **kwargs) -> dict:
         """
         initial models
         :param kwargs: the arguments that is pasted by __init__ function
@@ -67,7 +67,7 @@ class MultiTaskModel(PreTrainedModel):
         raise NotImplemented
 
     @abc.abstractmethod
-    def get_arg_forward_settings(self) -> dict():
+    def get_arg_forward_settings(self) -> dict:
         """
         get a dictionary of information about forward function's arguments based on tasks.
         this dictionary is used for passing or mapping function's inputs
@@ -120,7 +120,7 @@ class MultiTaskModel(PreTrainedModel):
                 if argument not in forward_arguments:
                     raise Exception(f"invalid argument in {task_id} task")
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs) -> BaseMultiTaskOutput:
         """
         model.forward()
         run .forward() for each task and return their output
