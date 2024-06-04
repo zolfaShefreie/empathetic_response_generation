@@ -1,7 +1,9 @@
 from abc import ABC
 from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, EncoderDecoderModel, EncoderDecoderConfig,\
-    AutoConfig
+    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
 import enum
+
+from utils.models import MultiTaskModel
 
 
 class ModelType(enum.Enum):
@@ -160,35 +162,109 @@ class Roberta2DialoGPT(EncoderDecoderModel, ABC):
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
-    def forward(
-                self,
-                input_ids=None,
-                attention_mask=None,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_outputs=None,
-                past_key_values=None,
-                inputs_embeds=None,
-                decoder_inputs_embeds=None,
-                labels=None,
-                use_cache=None,
-                output_attentions=None,
-                output_hidden_states=None,
-                return_dict=None,
-                **kwargs):
-        return super().forward(input_ids=input_ids,
-                                   attention_mask=attention_mask,
-                                   decoder_input_ids=decoder_input_ids,
-                                   decoder_attention_mask=decoder_attention_mask,
-                                   encoder_outputs=encoder_outputs,
-                                   past_key_values=past_key_values,
-                                   inputs_embeds=inputs_embeds,
-                                   decoder_inputs_embeds=decoder_inputs_embeds,
-                                   labels=labels,
-                                   use_cache=use_cache,
-                                   output_attentions=output_attentions,
-                                   output_hidden_states=output_hidden_states,
-                                   return_dict=return_dict,
-                                   **kwargs
-                                   )
 
+class EmotionRoberta2DialoGPT(MultiTaskModel):
+
+    def __init__(self,
+                 config: PretrainedConfig = None,
+                 *inputs,
+                 **kwargs):
+        kwargs['bos_token_id'] = kwargs.get('bos_token_id', 0)
+        kwargs['eos_token_id'] = kwargs.get('eos_token_id', 2)
+        kwargs['pad_token_id'] = kwargs.get('pad_token_id', 50266)
+        kwargs['embedding_tokens_len'] = kwargs.get('embedding_tokens_len', 50267)
+        kwargs['num_labels'] = kwargs.get('num_labels', 32)
+        kwargs['encoder_decoder_config'] = kwargs.get('encoder_decoder_config', None)
+        super().__init__(config=config, *inputs, **kwargs)
+
+    def initial_models(self, **kwargs) -> dict:
+        """
+        initial models
+        :param kwargs: the arguments that is pasted by __init__ function
+        :return: a dictionary that shows task_id and its task (model)
+            Example:
+            {
+            "task_1": self.response_generator,
+            "task_2": self.classifier,
+            ...
+            }
+
+            WARNING: if you doesn't put tasks correctly in dict the model doesn't run the task for training and testing
+        """
+        self.encoder_decoder = Roberta2DialoGPT(bos_token_id=kwargs['bos_token_id'],
+                                                eos_token_id=kwargs['eos_token_id'],
+                                                pad_token_id=kwargs['pad_token_id'],
+                                                config=kwargs['encoder_decoder_config'],
+                                                embedding_tokens_len=kwargs['embedding_tokens_len'])
+
+        self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",
+                                                                                     num_labels=kwargs['num_labels'])
+
+        return {
+            'response_generator': self.encoder_decoder,
+            'emotion_classifier': self.emotion_classifier
+        }
+
+    def set_shared_layers(self):
+        """
+        make the specific layers shared
+        :return:
+        """
+        encoder = getattr(self.encoder_decoder, 'encoder')
+        setattr(self.emotion_classifier, 'roberta', encoder)
+
+    def get_arg_forward_settings(self) -> dict:
+        """
+        get a dictionary of information about forward function's arguments based on tasks.
+        this dictionary is used for passing or mapping function's inputs
+        :return: dictionary with below format
+        {
+            "task_id": {
+                "arg_name_in_forward_func": "arg_name of forward functions of task model"
+            }
+        }
+
+        Example:
+        {
+            "task_1": {
+                "input_ids": "input_ids",
+                "attention_mask": "attention_mask",
+                "labels_1": "labels",
+            },
+
+            "task_2": {
+                "input_ids": "input_ids",
+                "attention_mask": "attention_mask",
+                "labels_2": "labels",
+            }
+        }
+
+        """
+        return {
+            'response_generator': {
+                'input_ids': 'input_ids',
+                'attention_mask': 'attention_mask',
+                "decoder_input_ids": 'decoder_input_ids',
+                'decoder_attention_mask': 'decoder_attention_mask',
+                'encoder_outputs': 'encoder_outputs',
+                'past_key_values': 'past_key_values',
+                'inputs_embeds': 'inputs_embeds',
+                'decoder_inputs_embeds': 'decoder_inputs_embeds',
+                'labels': 'labels',
+                'use_cache': 'use_cache',
+                'output_attentions': 'output_attentions',
+                'output_hidden_states': 'output_hidden_states',
+            },
+
+            'emotion_classifier': {
+                'input_ids': 'input_ids',
+                'attention_mask': 'attention_mask',
+                'token_type_ids': 'token_type_ids',
+                'position_ids': 'position_ids',
+                'head_mask': 'head_mask',
+                'inputs_embeds': 'inputs_embeds',
+                'emotion_labels': 'labels',
+                'output_attentions': 'output_attentions',
+                'output_hidden_states': 'output_hidden_states'
+            }
+        }

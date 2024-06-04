@@ -9,7 +9,7 @@ class BaseMultiTaskOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
 
 
-class MultiTaskModel(PreTrainedModel):
+class MultiTaskModel(PreTrainedModel, abc.ABC):
 
     def __init__(self,
                  config: PretrainedConfig = PretrainedConfig(),
@@ -133,7 +133,7 @@ class MultiTaskModel(PreTrainedModel):
 
         for task_id, task_model in self.TASK_CONFIG.items():
             # get input data for forward function for each task
-            task_kwarg = {task_arg_name: kwargs[arg_name]
+            task_kwarg = {task_arg_name: kwargs.get(arg_name, None)
                           for arg_name, task_arg_name in self.FORWARD_ARGUMENT_CONFIG[task_id].items()}
             # run .forward for task and get output
             task_output = task_model.forward(return_dict=True, **task_kwarg)
