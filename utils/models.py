@@ -10,9 +10,13 @@ class BaseMultiTaskOutput(ModelOutput):
 
 
 class MultiTaskModel(PreTrainedModel, abc.ABC):
+    """
+    WARNING:
+        you can't use this class for multiple generative models.
+    """
 
     def __init__(self,
-                 config: PretrainedConfig = PretrainedConfig(),
+                 config: PretrainedConfig = None,
                  *inputs,
                  **kwargs):
 
@@ -25,6 +29,20 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
         self.FORWARD_ARGUMENT_CONFIG = self.get_arg_forward_settings()
         self._validate_task_config()
+
+        if self.get_generative_task_id() is not None and self.get_generative_task_id() not in self.TASK_CONFIG.keys():
+            raise Exception(f"{self.get_generative_task_id()} not found")
+
+        # these will be used on multiTaskTrainer
+        self.TASK_ORDER = list(self.TASK_CONFIG)
+
+    @abc.abstractmethod
+    def get_generative_task_id(self):
+        """
+        get the task id of generative task. if there is no generative task return None
+        :return:
+        """
+        raise NotImplementedError
 
     @abc.abstractmethod
     def initial_models(self, **kwargs) -> dict:
@@ -138,13 +156,29 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
             # run .forward for task and get output
             task_output = task_model.forward(return_dict=True, **task_kwarg)
 
+            # add attribute and its value of one task to output object
+            if task_id == self.get_generative_task_id():
+                # use the original names for generative task to avoid overriding .generate() function
+                for attr_name, attr_value in task_output.__dict__.items():
+                    if attr_name == "loss":
+                        setattr(output_obj, f"{task_id}_{attr_name}", attr_value)
+                    else:
+                        setattr(output_obj, f"{attr_name}", attr_value)
+
+            else:
+                for attr_name, attr_value in task_output.__dict__.items():
+                    setattr(output_obj, f"{task_id}_{attr_name}", attr_value)
+
             # add its loss to list
             if task_output.loss is not None:
                 losses.append(task_output.loss)
-            # add attribute and its value of one task to output object
-            setattr(output_obj, task_id, task_output)
 
         # aggregate losses
-        output_obj.loss = sum(losses) if len(losses) > 0 else None
+        setattr(output_obj, 'loss', sum(losses) if len(losses) > 0 else None)
 
         return output_obj
+
+    def prepare_inputs_for_generation(self, *args, **kwargs):
+        if self.get_generative_task_id() is not None:
+            return self.TASK_CONFIG[self.get_generative_task_id()].prepare_inputs_for_generation(*args, **kwargs)
+        return None

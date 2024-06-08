@@ -205,6 +205,13 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
             'emotion_classifier': self.emotion_classifier
         }
 
+    def get_generative_task_id(self):
+        """
+        get the task id of generative task. if there is no generative task return None
+        :return:
+        """
+        return 'response_generator'
+
     def set_shared_layers(self):
         """
         make the specific layers shared
@@ -268,3 +275,6 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 'output_hidden_states': 'output_hidden_states'
             }
         }
+
+
+print(EmotionRoberta2DialoGPT(config=PretrainedConfig()).can_generate())
