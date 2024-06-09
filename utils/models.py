@@ -44,6 +44,13 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
         """
         raise NotImplementedError
 
+    def get_generative_output_key_name(self):
+        """
+        get the output key name of generative task.
+        :return:
+        """
+        return "logits"
+
     @abc.abstractmethod
     def initial_models(self, **kwargs) -> dict:
         """
