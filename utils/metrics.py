@@ -1,20 +1,48 @@
+import enum
+
 from transformers import EvalPrediction
 from collections import Counter
 import evaluate
 import numpy as np
+from sklearn.metrics import f1_score
 
 
 class Metrics:
+
+    class TaskEnum(enum.Enum):
+        classifier = 'classifier'
+        text_generator = 'text_generator'
+
+        @classmethod
+        def list(cls):
+            """
+            :return: list of values
+            """
+            return list(map(lambda c: c.value, cls))
+
     PPL = evaluate.load("perplexity", module_type="metric")
     BLEURT = evaluate.load("bleurt", module_type="metric")
     ROUGE = evaluate.load('rouge')
     BLEU = evaluate.load("bleu")
     ACCURACY = evaluate.load('accuracy')
-    MAX_ORDER = 4
+    BLEU_MAX_ORDER = 4
 
-    def __init__(self, tokenizer, decoder_name: str = "gpt2"):
+    def __init__(self, tokenizer, task_list: list, decoder_name: str = "gpt2"):
+        """
+        initial of metric object
+        :param tokenizer:
+        :param task_list: a list of task that shows order of outputs of tasks
+        :param decoder_name: is used on PPL metric
+        """
         self.tokenizer = tokenizer
         self.decoder_id = decoder_name
+        self._validate_task_list(task_list=task_list)
+        self.task_list = task_list
+
+    def _validate_task_list(self, task_list: list):
+        for task in task_list:
+            if task not in self.TaskEnum.list():
+                raise Exception("invalid task")
 
     @classmethod
     def n_grams(cls, text: str, n: int) -> list:
@@ -53,25 +81,57 @@ class Metrics:
                 'inter_dist1': inter_dist1,
                 'inter_dist2': inter_dist2}
 
-    def compute(self, pred: EvalPrediction) -> dict:
+    def compute_text_generator_metric(self, pred, labels) -> dict:
+        """
+        compute some metrics for text generator task
+        :param pred:
+        :param labels:
+        :return:
+        """
         result = dict()
-
-        labels_ids = pred.label_ids
-        pred_ids = pred.predictions
 
         # metrics using integer
         # result.update(self.ACCURACY.compute(references=labels_ids, predictions=pred_ids))
 
         # convert ids to token ids version
-        pred_str = self.tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
-        labels_ids[labels_ids == -100] = self.tokenizer.pad_token_id
-        label_str = self.tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
+        pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
+        labels[labels == -100] = self.tokenizer.pad_token_id
+        label_str = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
 
         # metrics using token version
         result.update(self.ROUGE.compute(predictions=pred_str, references=label_str))
         result['mean_perplexity'] = self.PPL.compute(predictions=pred_str, model_id=self.decoder_id)['mean_perplexity']
-        result['bleu'] = self.BLEU.compute(predictions=pred_str, references=label_str, max_order=self.MAX_ORDER)['bleu']
+        result['bleu'] = self.BLEU.compute(predictions=pred_str, references=label_str, max_order=self.BLEU_MAX_ORDER)['bleu']
         result['bluert_score'] = self.BLEURT.compute(predictions=pred_str, references=label_str)['scores']
         result.update(self.distinct(seqs=pred_str))
+
+        return result
+
+    def compute_classifier_metric(self, pred, labels) -> dict:
+        """
+        compute some metrics for text classifier task
+        :param pred:
+        :param labels:
+        :return:
+        """
+        result = dict()
+        result['f1'] = f1_score(labels, pred, average='micro')
+        result.update(self.ACCURACY.compute(references=labels, predictions=pred))
+        return result
+
+    def compute(self, pred: EvalPrediction) -> dict:
+        """
+        compute metrics for each task
+        :param pred: output of prediction_step of trainer
+        :return: 
+        """
+
+        result = dict()
+
+        for i, task_name in enumerate(self.task_list):
+            pred_task, labels_task = pred.predictions[i], pred.label_ids[i]
+            func_task = getattr(self, f"compute_{task_name}_metric", None)
+            if not func_task:
+                result.update(func_task(pred=pred_task, labels=labels_task))
 
         return result
