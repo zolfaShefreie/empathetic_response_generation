@@ -166,7 +166,7 @@ class Roberta2DialoGPT(EncoderDecoderModel, ABC):
 class EmotionRoberta2DialoGPT(MultiTaskModel):
 
     def __init__(self,
-                 config: PretrainedConfig = None,
+                 config: PretrainedConfig = PretrainedConfig(),
                  *inputs,
                  **kwargs):
         kwargs['bos_token_id'] = kwargs.get('bos_token_id', 0)
@@ -275,6 +275,3 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 'output_hidden_states': 'output_hidden_states'
             }
         }
-
-
-print(EmotionRoberta2DialoGPT(config=PretrainedConfig()).can_generate())

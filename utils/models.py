@@ -16,7 +16,7 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
     """
 
     def __init__(self,
-                 config: PretrainedConfig = None,
+                 config: PretrainedConfig = PretrainedConfig(),
                  *inputs,
                  **kwargs):
 

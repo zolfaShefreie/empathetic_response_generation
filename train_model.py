@@ -6,6 +6,7 @@ from model_data_process import models
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_MODEL_ID
 from utils.callbacks import SaveHistoryCallback
 from utils.metrics import Metrics
+from utils.trainer import MultiTaskTrainer
 
 from transformers import RobertaTokenizer, Seq2SeqTrainingArguments, Seq2SeqTrainer, DefaultFlowCallback, \
     EarlyStoppingCallback, trainer_utils
@@ -16,13 +17,6 @@ class TrainInterface(BaseInterface):
     DESCRIPTION = "You can run the train process using this interface"
 
     ARGUMENTS = {
-        'model_type': {
-            'help': f'you can choose between {models.ModelType.roberta_shared.name} and '
-                    f'{models.ModelType.roberta_gpt2.name}',
-            'choices': [m_type.name for m_type in models.ModelType],
-            'required': True,
-            'default': models.ModelType.roberta_shared.name
-        },
         'number_of_epochs': {
             'help': 'number of training epoch. it must be positive integer',
             'type': int,
@@ -117,12 +111,6 @@ class TrainInterface(BaseInterface):
         },
     }
 
-    MODELS = {
-        models.ModelType.roberta_shared.name: models.RobertaShared,
-        models.ModelType.roberta_gpt2.name: models.Roberta2GPT2,
-        models.ModelType.roberta_dialogpt.name: models.Roberta2DialoGPT
-    }
-
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
                                                    max_len=300,
                                                    new_special_tokens={
@@ -136,7 +124,9 @@ class TrainInterface(BaseInterface):
         ConversationFormatter(train_split=True),
         CONVERSATION_TOKENIZER,
         ToTensor(),
-        PreProcessEncoderDecoderInput(tokenizer=CONVERSATION_TOKENIZER.tokenizer)
+        PreProcessEncoderDecoderInput(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
+                                      dict_meta_data={'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
+                                                      'labels': 3, 'emotion_labels': 5})
     ])
 
     def validate_number_of_epochs(self, value):
@@ -150,7 +140,7 @@ class TrainInterface(BaseInterface):
         :return:
         """
         return Seq2SeqTrainingArguments(
-            output_dir=self.save_dir if self.save_dir is not None else f"{DEFAULT_SAVE_DIR_PREFIX}/{self.model_type}",
+            output_dir=self.save_dir if self.save_dir is not None else f"{DEFAULT_SAVE_DIR_PREFIX}/empathetic_chatbot",
             overwrite_output_dir=True,
             evaluation_strategy=self.evaluation_strategy,
             eval_steps=self.eval_steps,
@@ -174,9 +164,9 @@ class TrainInterface(BaseInterface):
 
             # hub configs
             push_to_hub=self.push_to_hub,
-            hub_model_id=HUB_MODEL_ID[self.model_type],
+            hub_model_id=HUB_MODEL_ID,
             hub_strategy='checkpoint',
-            hub_private_repo=HUB_PRIVATE_REPO[self.model_type],
+            hub_private_repo=HUB_PRIVATE_REPO,
             resume_from_checkpoint='last-checkpoint',
             hub_token=HUB_ACCESS_TOKEN,
         )
@@ -186,16 +176,17 @@ class TrainInterface(BaseInterface):
         train_dataset = EmpatheticDialoguesDataset(split='train', transform=self.TRANSFORMS)
         val_dataset = EmpatheticDialoguesDataset(split='validation', transform=self.TRANSFORMS)
 
-        model_class = self.MODELS[self.model_type]
+        model_class = models.EmotionRoberta2DialoGPT
         try:
-            model = model_class.from_pretrained(HUB_MODEL_ID[self.model_type], token=HUB_ACCESS_TOKEN)
+            model = model_class.from_pretrained(HUB_MODEL_ID, token=HUB_ACCESS_TOKEN)
         except Exception as e:
             model = model_class(embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
                                 bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
                                 eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-                                pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id)
+                                pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+                                num_labels=32)
 
-        trainer = Seq2SeqTrainer(
+        trainer = MultiTaskTrainer(
             model=model,
             args=self.get_training_args(),
             train_dataset=train_dataset,
