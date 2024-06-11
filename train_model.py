@@ -126,7 +126,7 @@ class TrainInterface(BaseInterface):
         ToTensor(),
         PreProcessEncoderDecoderInput(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
                                       dict_meta_data={'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
-                                                      'labels': 3, 'emotion_labels': 5})
+                                                      'labels': 3, 'emotion_labels': 6})
     ])
 
     def validate_number_of_epochs(self, value):

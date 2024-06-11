@@ -4,8 +4,10 @@ from transformers import Seq2SeqTrainer, EncoderDecoderModel, GenerationConfig
 import torch.nn as nn
 import torch
 from transformers.integrations import is_deepspeed_zero3_enabled
-from transformers.trainer_pt_utils import nested_detach, smp_forward_only, smp_nested_concat
+from transformers.trainer_pt_utils import nested_detach
 from transformers.utils import is_sagemaker_mp_enabled
+if is_sagemaker_mp_enabled():
+  from transformers.trainer_pt_utils import smp_forward_only, smp_nested_concat
 
 from utils.models import MultiTaskModel
 
