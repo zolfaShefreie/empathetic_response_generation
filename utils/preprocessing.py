@@ -210,8 +210,11 @@ class TextCleaner:
             else self._clean_single_text(texts)
 
         if self.have_label:
-            return np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
-                       else np.array([cleaned_result]), np.array(sample[-1])
+            labels = tuple([np.array(each)
+                            if isinstance(each, list) or isinstance(each, int) or isinstance(each, np.ndarray)
+                            else np.array([each]) for each in sample[1:]])
+            return (np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray)
+                    else np.array([cleaned_result]), ) + labels
         else:
             return np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
                 else np.array([cleaned_result])
@@ -239,7 +242,10 @@ class ConversationFormatter:
         conversation = f"{self.SPECIAL_TOKEN_SPLIT_UTTERANCE}".join(texts[:-1])
 
         if self.train_split:
-            return np.array([conversation]), np.array([last_utter]), np.array([sample[-1]])
+            labels = tuple([np.array(each)
+                            if isinstance(each, list) or isinstance(each, int) or isinstance(each, np.ndarray)
+                            else np.array([each]) for each in sample[1:]])
+            return (np.array([conversation]), np.array([last_utter])) + labels
         else:
             return np.array([conversation]), np.array([last_utter])
 
@@ -285,15 +291,15 @@ class ConversationTokenizer:
                                             truncation=True)
 
         if self.train_split:
-            label = self.tokenizer.encode_plus(sample[-1][0],
+            label = self.tokenizer.encode_plus(sample[2][0],
                                                add_special_tokens=True,
                                                max_length=self.MAX_LEN,
                                                padding='max_length',
                                                return_attention_mask=True,
                                                return_token_type_ids=True,
                                                truncation=True)
-            return inputs['input_ids'], inputs['attention_mask'], inputs['token_type_ids'], \
-                   label['input_ids'], label['attention_mask'], label['token_type_ids']
+            return (inputs['input_ids'], inputs['attention_mask'], inputs['token_type_ids'],
+                   label['input_ids'], label['attention_mask'], label['token_type_ids']) + tuple(sample[3:])
         else:
             return inputs['input_ids'], inputs['attention_mask'], inputs['token_type_ids']
 
