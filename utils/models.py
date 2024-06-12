@@ -1,10 +1,12 @@
-from transformers import PreTrainedModel, PretrainedConfig
+import dataclasses
+from transformers import PreTrainedModel, PretrainedConfig, RobertaPreTrainedModel
 from transformers.modeling_outputs import ModelOutput
 from typing import Optional
 import torch
 import abc
 
 
+@dataclasses.dataclass
 class BaseMultiTaskOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
 
@@ -33,6 +35,10 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
         if self.get_generative_task_id() is not None and self.get_generative_task_id() not in self.TASK_CONFIG.keys():
             raise Exception(f"{self.get_generative_task_id()} not found")
 
+        if self.get_generative_task_id() is not None:
+            self.generation_config = self.TASK_CONFIG[self.get_generative_task_id()].generation_config
+            self.config.is_encoder_decoder = True
+
         # these will be used on multiTaskTrainer
         self.TASK_ORDER = list(self.TASK_CONFIG)
 
@@ -40,6 +46,14 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
     def get_generative_task_id(self):
         """
         get the task id of generative task. if there is no generative task return None
+        :return:
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_encoder(self):
+        """
+        get encoder of model if model is encoderdecoder model
         :return:
         """
         raise NotImplementedError
@@ -168,20 +182,20 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
                 # use the original names for generative task to avoid overriding .generate() function
                 for attr_name, attr_value in task_output.__dict__.items():
                     if attr_name == "loss":
-                        setattr(output_obj, f"{task_id}_{attr_name}", attr_value)
+                        output_obj[f"{task_id}_{attr_name}"] = attr_value
                     else:
-                        setattr(output_obj, f"{attr_name}", attr_value)
+                        output_obj[f"{attr_name}"] = attr_value
 
             else:
                 for attr_name, attr_value in task_output.__dict__.items():
-                    setattr(output_obj, f"{task_id}_{attr_name}", attr_value)
+                    output_obj[f"{task_id}_{attr_name}"] = attr_value
 
             # add its loss to list
             if task_output.loss is not None:
                 losses.append(task_output.loss)
 
         # aggregate losses
-        setattr(output_obj, 'loss', sum(losses) if len(losses) > 0 else None)
+        output_obj['loss'] = sum(losses) if len(losses) > 0 else None
 
         return output_obj
 

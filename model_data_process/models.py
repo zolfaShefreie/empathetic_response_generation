@@ -3,7 +3,7 @@ from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, Enco
     AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
 import enum
 
-from utils.models import MultiTaskModel
+from utils.models import MultiTaskModel, BaseMultiTaskOutput
 
 
 class ModelType(enum.Enum):
@@ -134,7 +134,7 @@ class Roberta2DialoGPT(EncoderDecoderModel, ABC):
 
         config_decoder.is_decoder = True
         config_decoder.add_cross_attention = True
-        config_decoder.max_length = 64
+        config_decoder.max_new_tokens = 64
         config_decoder.min_length = 2
 
         encoder = AutoModel.from_config(config=config_encoder)
@@ -153,7 +153,7 @@ class Roberta2DialoGPT(EncoderDecoderModel, ABC):
 
         # sensible parameters for beam search
         # set decoding params
-        config.max_length = 64
+        config.max_new_tokens = 64
         config.min_length = 2
         config.early_stopping = True
         config.no_repeat_ngram_size = 3
@@ -275,3 +275,25 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 'output_hidden_states': 'output_hidden_states'
             }
         }
+
+    def get_encoder(self):
+        """
+        get encoder of model if model is encoderdecoder model
+        :return:
+        """
+        return self.TASK_CONFIG[self.get_generative_task_id()].get_encoder()
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None,
+                emotion_labels=None, labels=None,  **kwargs) -> BaseMultiTaskOutput:
+        """
+        rewrite this function to show its arguments and avoid empty batch Error
+        :param input_ids:
+        :param attention_mask:
+        :param token_type_ids:
+        :param emotion_labels:
+        :param labels:
+        :param kwargs:
+        :return:
+        """
+        return super().forward(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+                               emotion_labels=emotion_labels, labels=labels, **kwargs)

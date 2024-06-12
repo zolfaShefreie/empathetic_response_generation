@@ -89,7 +89,7 @@ class MultiTaskTrainer(Seq2SeqTrainer):
         with torch.no_grad():
             generated_tokens = None
             if model.get_generative_task_id() is not None and self.args.predict_with_generate and not prediction_loss_only:
-                generated_tokens = self.generate_in_pridection_step(model, inputs)
+                generated_tokens = self.generate_in_prediction_step(model, inputs)
 
             if is_sagemaker_mp_enabled():
                 raw_outputs = smp_forward_only(model, inputs)
