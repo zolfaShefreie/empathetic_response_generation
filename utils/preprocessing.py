@@ -259,6 +259,14 @@ class ToTensor:
         return tuple(torch.from_numpy(np.array(each)) for each in sample)
 
 
+class ToLong:
+
+    def __call__(self, sample):
+        if isinstance(sample, dict):
+            return {k: v.type(torch.long) for k, v in sample.items()}
+        return tuple(each.type(torch.long) for each in sample)
+
+
 class ConversationTokenizer:
 
     def __init__(self, tokenizer, train_split=True, max_len=128, new_special_tokens=None):

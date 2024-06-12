@@ -1,7 +1,7 @@
 from utils.interface import BaseInterface
 from model_data_process.dataset import EmpatheticDialoguesDataset
 from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTokenizer, TextCleaner, ToTensor, \
-    PreProcessEncoderDecoderInput
+    PreProcessEncoderDecoderInput, ToLong
 from model_data_process import models
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_MODEL_ID
 from utils.callbacks import SaveHistoryCallback
@@ -126,7 +126,8 @@ class TrainInterface(BaseInterface):
         ToTensor(),
         PreProcessEncoderDecoderInput(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
                                       dict_meta_data={'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
-                                                      'labels': 3, 'emotion_labels': 6})
+                                                      'labels': 3, 'emotion_labels': 6}),
+        ToLong(),
     ])
 
     def validate_number_of_epochs(self, value):
