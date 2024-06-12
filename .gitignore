@@ -160,4 +160,5 @@ cython_debug/
 .idea/
 
 # project files
-./data/cache/
+data/cache/
+models_checkpoint/
