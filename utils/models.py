@@ -42,6 +42,10 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
         # these will be used on multiTaskTrainer
         self.TASK_ORDER = list(self.TASK_CONFIG)
 
+    @property
+    def generative_task_generation_config(self):
+        return self.TASK_CONFIG[self.get_generative_task_id()].generation_config
+
     @abc.abstractmethod
     def get_generative_task_id(self):
         """

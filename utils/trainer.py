@@ -115,7 +115,7 @@ class MultiTaskTrainer(Seq2SeqTrainer):
                         outputs[model.get_generative_output_key_name()] = generated_tokens
 
                     logits = {k: v for k, v in outputs.items()
-                              if ('logic' in k) and (k not in ignore_keys + ["loss"])}
+                              if ('logit' in k) and (k not in ignore_keys + ["loss"])}
 
                 else:
                     loss = None
@@ -125,7 +125,7 @@ class MultiTaskTrainer(Seq2SeqTrainer):
                     if generated_tokens is not None:
                         outputs[model.get_generative_output_key_name()] = generated_tokens
 
-                    logits = {k: v for k, v in outputs.items() if ('logits' in k) and (k not in ignore_keys)}
+                    logits = {k: v for k, v in outputs.items() if ('logit' in k) and (k not in ignore_keys)}
 
                     # TODO: this used for xl transformers and i don't know how to handle it in multitask learning
                     # if self.args.past_index >= 0:
@@ -136,7 +136,7 @@ class MultiTaskTrainer(Seq2SeqTrainer):
 
         # make a function for it
         if has_labels and model.get_generative_task_id() is not None:
-            key_name = [k for k, v in model.TASK_CONFIG[model.get_generative_task_id()].items() if v == 'labels'][0]
+            key_name = {v: k for k, v in model.FORWARD_ARGUMENT_CONFIG[model.get_generative_task_id()].items()}['labels']
             generative_task_labels = inputs[key_name]
             if generative_task_labels.shape[-1] < self.model.generation_config.max_length:
                 generative_task_labels = self._pad_tensors_to_max_len(generative_task_labels, self.model.generation_config.max_length)
@@ -175,15 +175,15 @@ class MultiTaskTrainer(Seq2SeqTrainer):
 
         else:
             label_task_mapping = dict()
-            for k, v in model.FORWARD_ARGUMENT_CONFIG.items():
-                label_task_mapping[k] = [pass_key_name for o_key_name, pass_key_name in v.items()
-                                         if pass_key_name in labels.keys()]
+            for task_k, task_forward_arg_config in model.FORWARD_ARGUMENT_CONFIG.items():
+                label_task_mapping[task_k] = [pass_key_name for pass_key_name, o_key_name in task_forward_arg_config.items()
+                                              if pass_key_name in labels.keys()]
 
             output_task_mapping = dict()
             for task_id in model.TASK_ORDER:
                 output_task_mapping[task_id] = [k for k, v in logits.items() if task_id in k]
-                if model.get_generative_task_id() is not None:
-                    output_task_mapping[model.get_generative_task_id()] = [model.get_generative_output_key_name(), ]
+            if model.get_generative_task_id() is not None:
+                output_task_mapping[model.get_generative_task_id()] = [model.get_generative_output_key_name(), ]
 
             result_labels, result_logits = list(), list()
             for task_id in model.TASK_ORDER:
@@ -222,6 +222,9 @@ class MultiTaskTrainer(Seq2SeqTrainer):
         if "max_length" in gen_kwargs and gen_kwargs["max_length"] is None:
             gen_kwargs.pop("max_length")
 
+        if gen_kwargs.get("bos_token_id", None) is None:
+            gen_kwargs['bos_token_id'] = model.generative_task_generation_config.bos_token_id
+
         default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         gen_kwargs["synced_gpus"] = (
             gen_kwargs["synced_gpus"] if gen_kwargs.get("synced_gpus") is not None else default_synced_gpus
@@ -235,6 +238,7 @@ class MultiTaskTrainer(Seq2SeqTrainer):
                 and generation_inputs["labels"].shape == generation_inputs["decoder_input_ids"].shape
         ):
             generation_inputs = {k: v for k, v in inputs.items() if k != "decoder_input_ids"}
+
         generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
 
         if self.model.generation_config._from_model_config:
