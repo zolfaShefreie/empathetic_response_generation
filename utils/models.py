@@ -159,40 +159,71 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
                 if argument not in forward_arguments:
                     raise Exception(f"invalid argument in {task_id} task")
 
-    def forward(self, **kwargs) -> BaseMultiTaskOutput:
+    def get_output_single_task(self, task_id, is_generative: bool, **data_kwargs) -> (dict, float):
+        """
+        run forward function for single task
+        :param task_id: task_id
+        :param is_generative: a boolean that shows whether task is generative
+        :param data_kwargs:
+        :return: output, loss
+        """
+        output_dict = dict()
+        # get input data for forward function for each task
+        task_kwarg = {task_arg_name: data_kwargs.get(arg_name, None)
+                      for arg_name, task_arg_name in self.FORWARD_ARGUMENT_CONFIG[task_id].items()}
+        # run .forward for task and get output
+        task_output = self.TASK_CONFIG[task_id].forward(return_dict=True, **task_kwarg)
+
+        # add attribute and its value of one task to output object
+        if is_generative:
+            # use the original names for generative task to avoid overriding .generate() function
+            for attr_name, attr_value in task_output.__dict__.items():
+                if attr_name == "loss":
+                    output_dict[f"{task_id}_{attr_name}"] = attr_value
+                else:
+                    output_dict[f"{attr_name}"] = attr_value
+
+        else:
+            for attr_name, attr_value in task_output.__dict__.items():
+                output_dict[f"{task_id}_{attr_name}"] = attr_value
+
+        return output_dict, task_output.get('loss', None)
+
+    def forward(self, task_id=None, **kwargs) -> BaseMultiTaskOutput:
         """
         model.forward()
         run .forward() for each task and return their output
         WARNING: don't use positional argument in you code
+        :param task_id:
         :param kwargs:
         :return: a object of class of with attribute of lost and output for each task
         """
         output_obj = BaseMultiTaskOutput()
         losses = list()
+        if task_id is not None:
+            output_dict, loss = self.get_output_single_task(task_id=task_id,
+                                                            is_generative=self.get_generative_task_id() == task_id,
+                                                            **kwargs)
 
-        for task_id, task_model in self.TASK_CONFIG.items():
-            # get input data for forward function for each task
-            task_kwarg = {task_arg_name: kwargs.get(arg_name, None)
-                          for arg_name, task_arg_name in self.FORWARD_ARGUMENT_CONFIG[task_id].items()}
-            # run .forward for task and get output
-            task_output = task_model.forward(return_dict=True, **task_kwarg)
-
-            # add attribute and its value of one task to output object
-            if task_id == self.get_generative_task_id():
-                # use the original names for generative task to avoid overriding .generate() function
-                for attr_name, attr_value in task_output.__dict__.items():
-                    if attr_name == "loss":
-                        output_obj[f"{task_id}_{attr_name}"] = attr_value
-                    else:
-                        output_obj[f"{attr_name}"] = attr_value
-
-            else:
-                for attr_name, attr_value in task_output.__dict__.items():
-                    output_obj[f"{task_id}_{attr_name}"] = attr_value
+            for k, v in output_dict.items():
+                output_obj[k] = v
 
             # add its loss to list
-            if task_output.loss is not None:
-                losses.append(task_output.loss)
+            if loss is not None:
+                losses.append(loss)
+
+        else:
+            for task_id, task_model in self.TASK_CONFIG.items():
+                output_dict, loss = self.get_output_single_task(task_id=task_id,
+                                                                is_generative=self.get_generative_task_id() == task_id,
+                                                                **kwargs)
+
+                for k, v in output_dict.items():
+                    output_obj[k] = v
+
+                # add its loss to list
+                if loss is not None:
+                    losses.append(loss)
 
         # aggregate losses
         output_obj['loss'] = sum(losses) if len(losses) > 0 else None
@@ -200,6 +231,14 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
         return output_obj
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
+        """
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if self.get_generative_task_id() is not None:
-            return self.TASK_CONFIG[self.get_generative_task_id()].prepare_inputs_for_generation(*args, **kwargs)
+            result = self.TASK_CONFIG[self.get_generative_task_id()].prepare_inputs_for_generation(*args, **kwargs)
+            result.update({'task_id': self.get_generative_task_id()})
+            return result
         return None
