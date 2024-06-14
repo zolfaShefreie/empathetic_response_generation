@@ -224,6 +224,10 @@ class MultiTaskTrainer(Seq2SeqTrainer):
 
         if gen_kwargs.get("bos_token_id", None) is None:
             gen_kwargs['bos_token_id'] = model.generative_task_generation_config.bos_token_id
+        if gen_kwargs.get("pad_token_id", None) is None:
+            gen_kwargs['pad_token_id'] = model.generative_task_generation_config.pad_token_id
+        if gen_kwargs.get("eos_token_id", None) is None:
+            gen_kwargs['eos_token_id'] = model.generative_task_generation_config.eos_token_id
 
         default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         gen_kwargs["synced_gpus"] = (

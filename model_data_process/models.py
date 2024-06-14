@@ -176,6 +176,7 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
         kwargs['num_labels'] = kwargs.get('num_labels', 32)
         kwargs['encoder_decoder_config'] = kwargs.get('encoder_decoder_config', None)
         super().__init__(config=config, *inputs, **kwargs)
+        self.config.pad_token_id = kwargs.get('pad_token_id', 50266)
 
     def initial_models(self, **kwargs) -> dict:
         """

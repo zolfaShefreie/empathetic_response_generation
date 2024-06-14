@@ -170,6 +170,7 @@ class TrainInterface(BaseInterface):
             hub_private_repo=HUB_PRIVATE_REPO,
             resume_from_checkpoint='last-checkpoint',
             hub_token=HUB_ACCESS_TOKEN,
+            save_safetensors=False,
         )
 
     def _run_main_process(self):

@@ -246,3 +246,8 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
             result.update({'task_id': self.get_generative_task_id()})
             return result
         return None
+
+    def _reorder_cache(self, past_key_values, beam_idx):
+        # apply encoder-decoder cache reordering here
+        if self.get_generative_task_id() is not None:
+            return self.TASK_CONFIG[self.get_generative_task_id()]._reorder_cache(past_key_values, beam_idx)
