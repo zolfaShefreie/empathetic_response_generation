@@ -194,7 +194,7 @@ class TrainInterface(BaseInterface):
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             compute_metrics=Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
-                                    task_list=['classifier', 'text_generator']).compute,
+                                    task_list=['text_generator', 'classifier']).compute,
             callbacks=[SaveHistoryCallback(),
                        DefaultFlowCallback(),
                        EarlyStoppingCallback(early_stopping_patience=2)]

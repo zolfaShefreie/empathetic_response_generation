@@ -1,5 +1,4 @@
 import enum
-
 from transformers import EvalPrediction
 from collections import Counter
 import evaluate
@@ -97,6 +96,7 @@ class Metrics:
         pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
         labels[labels == -100] = self.tokenizer.pad_token_id
         label_str = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+        pred_str = ['.' if not each else each for each in pred_str]
 
         # metrics using token version
         result.update(self.ROUGE.compute(predictions=pred_str, references=label_str))
@@ -114,6 +114,11 @@ class Metrics:
         :param labels:
         :return:
         """
+        def after_result(z):
+            result = 1/(1 + np.exp(-z))
+            return np.argmax(result, axis=-1)
+
+        pred = after_result(pred)
         result = dict()
         result['f1'] = f1_score(labels, pred, average='micro')
         result.update(self.ACCURACY.compute(references=labels, predictions=pred))
@@ -123,7 +128,7 @@ class Metrics:
         """
         compute metrics for each task
         :param pred: output of prediction_step of trainer
-        :return: 
+        :return:
         """
 
         result = dict()
@@ -131,7 +136,7 @@ class Metrics:
         for i, task_name in enumerate(self.task_list):
             pred_task, labels_task = pred.predictions[i], pred.label_ids[i]
             func_task = getattr(self, f"compute_{task_name}_metric", None)
-            if not func_task:
+            if func_task is not None:
                 result.update(func_task(pred=pred_task, labels=labels_task))
 
         return result
