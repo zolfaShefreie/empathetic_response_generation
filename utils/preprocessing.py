@@ -270,11 +270,10 @@ class KnowledgeFormatter:
                          'HasProperty': 'can be characterized by being/having',
                          'Desires': 'desires', }
 
-    def __init__(self, social_rel_pos: int, event_rel_pos: int, entity_rel_pos: int):
+    def __init__(self, social_rel_pos: int, event_rel_pos: int = None, entity_rel_pos: int = None):
         self.social_rel_pos = social_rel_pos
         self.event_rel_pos = event_rel_pos
         self.entity_rel_pos = entity_rel_pos
-
 
     @staticmethod
     def _join_all_nodes_for_same_rel(nodes: list) -> str:
@@ -323,12 +322,33 @@ class KnowledgeFormatter:
         return ", ".join(social_knw_result['xReact']), other_rel_reformat
 
     @classmethod
-    def _formatting_event_centered_rel_results(cls, results: dict) -> str:
-        pass
+    def _formatting_event_entity_rel_results(cls, results: dict) -> str:
+        """
+        return relations with text format
+        :param results:
+        :return: text version of these data
+        """
+        return ".\n".join([cls._convert_nodes_with_rel(nodes=rel_nodes,
+                                                       rel=rel_name,
+                                                       root_node=text)
+                           for text, rel_nodes in results.items()
+                           for rel_name, nodes in rel_nodes.items()])
 
-    @classmethod
-    def _formatting_physical_entities_rel_results(cls, results: dict) -> str:
-        pass
+    def __call__(self, sample) -> tuple:
+        """
+        apply reformatting for knowledge
+        :param sample:
+        :return:
+        """
+        # apply social reformatting
+        sample[self.social_rel_pos] = self._formatting_social_interaction_rel_results(sample[self.social_rel_pos])
+
+        # apply other reformatting
+        other_map_func = {rel_pos: self._formatting_event_entity_rel_results
+                          for rel_pos in [self.event_rel_pos, self.entity_rel_pos]
+                          if rel_pos is not None}
+        return tuple([sample[i] if i not in other_map_func.keys() else other_map_func[i](sample[i])
+                      for i in range(len(sample))])
 
 
 class ToTensor:
