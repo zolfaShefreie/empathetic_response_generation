@@ -43,7 +43,7 @@ class Comet:
         use_task_specific_params(self.model, "summarization")
         self.model.zero_grad()
 
-    def generate(self, input_event, rel):
+    def generate(self, input_event, rel, num_generate=5):
         query = "{} {} [GEN]".format(input_event, rel)
 
         with torch.no_grad():
@@ -59,7 +59,7 @@ class Comet:
                 attention_mask=attention_mask,
                 decoder_start_token_id=None,
                 num_beams=5,
-                num_return_sequences=5,
+                num_return_sequences=num_generate,
             )
 
             dec = self.tokenizer.batch_decode(
