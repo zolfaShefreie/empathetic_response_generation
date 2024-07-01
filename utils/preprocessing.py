@@ -250,6 +250,87 @@ class ConversationFormatter:
             return np.array([conversation]), np.array([last_utter])
 
 
+class KnowledgeFormatter:
+
+    # same as knowledge generator
+    SOCIAL_INTERACTION_REL = {'xIntent': 'because X wanted',
+                              'xReact': 'as a result, X feels',
+                              'xNeed': 'but before, X needed',
+                              'xWant': 'as a result, X wants',
+                              'xEffect': 'as a result, X wil', }
+    EVENT_CENTERED_REL = {'Causes': 'causes',
+                          'HinderedBy': 'can be hindered by',
+                          'xReason': 'because',
+                          'isAfter': 'happens after',
+                          'isBefore': 'happens before',
+                          'HasSubEvent': 'includes the event/action',
+                          'isFilledBy': 'blank can be filled by', }
+    PHYSICAL_ENTITIES = {'ObjectUse': 'is used for',
+                         'CapableOf': 'is/are capable of',
+                         'HasProperty': 'can be characterized by being/having',
+                         'Desires': 'desires', }
+
+    def __init__(self, social_rel_pos: int, event_rel_pos: int, entity_rel_pos: int):
+        self.social_rel_pos = social_rel_pos
+        self.event_rel_pos = event_rel_pos
+        self.entity_rel_pos = entity_rel_pos
+
+
+    @staticmethod
+    def _join_all_nodes_for_same_rel(nodes: list) -> str:
+        """
+        join all result of generate nodes for a text and rel
+        :param nodes:
+        :return:
+        """
+        if len(nodes) == 0:
+            return None
+        if len(nodes) == 1:
+            return nodes[0]
+        return ", ".join(nodes[:-1]) + f" and {nodes[-1]}"
+
+    @classmethod
+    def _convert_nodes_with_rel(cls, nodes: list, rel: str, root_node: str = None) -> str:
+        """
+        make a text with root_node, rel, nodes
+        :param nodes: nodes shows generated nodes
+        :param rel: name of relation that is in SOCIAL_INTERACTION_REL or EVENT_CENTERED_REL or PHYSICAL_ENTITIES keys
+        :param root_node:
+        :return: text
+        """
+        if len(nodes) == 0:
+            return str()
+
+        readable_rel = None
+        for categories in [cls.SOCIAL_INTERACTION_REL, cls.PHYSICAL_ENTITIES, cls.EVENT_CENTERED_REL]:
+            if rel in categories.keys():
+                readable_rel = categories[rel]
+        return f"{root_node}{' ' if root_node is not None else ''}{readable_rel} {cls._join_all_nodes_for_same_rel(nodes)}"
+
+    @classmethod
+    def _formatting_social_interaction_rel_results(cls, results: dict) -> tuple:
+        """
+        return relations with text format
+        :param results:
+        :return: xreact results, other rel results
+        """
+        social_knw_result = list(results.values())[0]
+        other_rel_reformat = ".\n".join([cls._convert_nodes_with_rel(nodes=rel_nodes,
+                                                                     rel=rel_name,
+                                                                     root_node=None)
+                                         for rel_name, rel_nodes in social_knw_result.items()
+                                         if rel_name != 'xReact'])
+        return ", ".join(social_knw_result['xReact']), other_rel_reformat
+
+    @classmethod
+    def _formatting_event_centered_rel_results(cls, results: dict) -> str:
+        pass
+
+    @classmethod
+    def _formatting_physical_entities_rel_results(cls, results: dict) -> str:
+        pass
+
+
 class ToTensor:
     """
     Convert ndarrays to Tensors

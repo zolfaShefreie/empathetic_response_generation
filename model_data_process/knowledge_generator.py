@@ -11,11 +11,11 @@ class KnowledgeGenerator:
     # todo: device based on device
     COMET = Comet(model_path='smetan/comet-bart-aaai', device='')
     STOP_WORDS = set(stopwords.words('english'))
-    SOCIAL_INTERACTION_REL = {'xIntent': 'because PersonX wanted',
-                              'xReact': 'as a result, PersonX feels',
-                              'xNeed': 'but before, PersonX needed',
-                              'xWant': 'as a result, PersonX wants',
-                              'xEffect': 'as a result, PersonX wil', }
+    SOCIAL_INTERACTION_REL = {'xIntent': 'because X wanted',
+                              'xReact': 'as a result, X feels',
+                              'xNeed': 'but before, X needed',
+                              'xWant': 'as a result, X wants',
+                              'xEffect': 'as a result, X wil', }
     EVENT_CENTERED_REL = {'Causes': 'causes',
                           'HinderedBy': 'can be hindered by',
                           'xReason': 'because',
@@ -116,30 +116,11 @@ class KnowledgeGenerator:
         return result
     
     @classmethod
-    def __call__(cls, texts: list, get_all_knw=True, special_token_version=True, *args, **kwargs):
+    def __call__(cls, texts: list, get_all_knw=True, *args, **kwargs):
         # todo: complete
         if len(texts) == 0:
             return dict()
         last_utter = texts[-1]
         cls.get_social_interaction_knowledge(text=last_utter)
-        cls.get_event_base_knowledge(text=". ".join(texts))
-        cls.get_entity_knowledge(text=", ".join(texts))
-
-    @classmethod
-    def _formatting_social_interaction_rel_results(cls, results: dict, special_token_version) -> str:
-        """
-        return relations
-        :param results:
-        :return:
-        """
-        return list(results.values())[0]
-
-    @classmethod
-    def _formatting_event_centered_rel_results(cls, results: dict) -> str:
-        pass
-
-    @classmethod
-    def _formatting_physical_entities_rel_results(cls, results: dict) -> str:
-        pass
-
-
+        cls.get_event_base_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0]))
+        cls.get_entity_knowledge(text=", ".join([text for i, text in enumerate(texts) if i % 2 == 0]))
