@@ -1,6 +1,7 @@
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
 import nltk
+import torch
 
 from utils.comet import Comet
 
@@ -8,8 +9,7 @@ nltk.download('popular')
 
 
 class KnowledgeGenerator:
-    # todo: device based on device
-    COMET = Comet(model_path='smetan/comet-bart-aaai', device='')
+    COMET = Comet(model_path='smetan/comet-bart-aaai', device='gpu' if torch.cuda.is_available() else 'cpu')
     STOP_WORDS = set(stopwords.words('english'))
     SOCIAL_INTERACTION_REL = {'xIntent': 'because X wanted',
                               'xReact': 'as a result, X feels',
@@ -116,11 +116,20 @@ class KnowledgeGenerator:
         return result
     
     @classmethod
-    def __call__(cls, texts: list, get_all_knw=True, *args, **kwargs):
-        # todo: complete
+    def run(cls, texts: list, get_all_knw: bool = True):
+        """
+        generate data for a list of text
+        :param texts: all utterance
+        :param get_all_knw: a boolean shows that just get social or all knowledge
+        :return:
+        """
+
         if len(texts) == 0:
             return dict()
         last_utter = texts[-1]
-        cls.get_social_interaction_knowledge(text=last_utter)
-        cls.get_event_base_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0]))
-        cls.get_entity_knowledge(text=", ".join([text for i, text in enumerate(texts) if i % 2 == 0]))
+        social_result = cls.get_social_interaction_knowledge(text=last_utter)
+        if not get_all_knw:
+            return social_result, None, None
+        return (social_result,
+                cls.get_event_base_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0])),
+                cls.get_entity_knowledge(text=", ".join([text for i, text in enumerate(texts) if i % 2 == 0])))
