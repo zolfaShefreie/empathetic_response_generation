@@ -11,9 +11,22 @@ class KnowledgeGenerator:
     # todo: device based on device
     COMET = Comet(model_path='smetan/comet-bart-aaai', device='')
     STOP_WORDS = set(stopwords.words('english'))
-    SOCIAL_INTERACTION_REL = ['xIntent', 'xReact', 'xNeed', 'xWant', 'xEffect']
-    EVENT_CENTERED_REL = ['Causes', 'HinderedBy', 'xReason', 'isAfter', 'isBefore', 'HasSubevent', 'isFilledBy']
-    PHYSICAL_ENTITIES = ['ObjectUse', 'CapableOf', 'HasProperty', 'Desires', ]
+    SOCIAL_INTERACTION_REL = {'xIntent': 'because PersonX wanted',
+                              'xReact': 'as a result, PersonX feels',
+                              'xNeed': 'but before, PersonX needed',
+                              'xWant': 'as a result, PersonX wants',
+                              'xEffect': 'as a result, PersonX wil', }
+    EVENT_CENTERED_REL = {'Causes': 'causes',
+                          'HinderedBy': 'can be hindered by',
+                          'xReason': 'because',
+                          'isAfter': 'happens after',
+                          'isBefore': 'happens before',
+                          'HasSubEvent': 'includes the event/action',
+                          'isFilledBy': 'blank can be filled by', }
+    PHYSICAL_ENTITIES = {'ObjectUse': 'is used for',
+                         'CapableOf': 'is/are capable of',
+                         'HasProperty': 'can be characterized by being/having',
+                         'Desires': 'desires', }
 
     @staticmethod
     def clean_comet_results(results: list) -> list:
@@ -38,7 +51,7 @@ class KnowledgeGenerator:
         :param text:
         :return:
         """
-        return cls._generate_knowledge(texts=[text, ], relations=cls.SOCIAL_INTERACTION_REL)
+        return cls._generate_knowledge(texts=[text, ], relations=list(cls.SOCIAL_INTERACTION_REL.keys()))
 
     @classmethod
     def get_event_base_knowledge(cls, text: str) -> dict:
@@ -48,7 +61,7 @@ class KnowledgeGenerator:
         :return: 
         """
         tokenized_sentences = sent_tokenize(text)
-        return cls._generate_knowledge(texts=tokenized_sentences, relations=cls.EVENT_CENTERED_REL)
+        return cls._generate_knowledge(texts=tokenized_sentences, relations=list(cls.EVENT_CENTERED_REL.keys()))
 
     @classmethod
     def get_entity_knowledge(cls, text: str) -> dict:
@@ -72,7 +85,7 @@ class KnowledgeGenerator:
             all_entities += sentence_entity
 
         # generate nodes for each entity and rel
-        return cls._generate_knowledge(texts=all_entities, relations=cls.PHYSICAL_ENTITIES)
+        return cls._generate_knowledge(texts=all_entities, relations=list(cls.PHYSICAL_ENTITIES.keys()))
 
     @classmethod
     def _generate_knowledge(cls, texts: list, relations: list):
@@ -103,13 +116,30 @@ class KnowledgeGenerator:
         return result
     
     @classmethod
-    def __call__(cls, texts: list, get_all_knw=True, *args, **kwargs):
+    def __call__(cls, texts: list, get_all_knw=True, special_token_version=True, *args, **kwargs):
         # todo: complete
         if len(texts) == 0:
-            return None
+            return dict()
         last_utter = texts[-1]
         cls.get_social_interaction_knowledge(text=last_utter)
         cls.get_event_base_knowledge(text=". ".join(texts))
         cls.get_entity_knowledge(text=", ".join(texts))
+
+    @classmethod
+    def _formatting_social_interaction_rel_results(cls, results: dict, special_token_version) -> str:
+        """
+        return relations
+        :param results:
+        :return:
+        """
+        return list(results.values())[0]
+
+    @classmethod
+    def _formatting_event_centered_rel_results(cls, results: dict) -> str:
+        pass
+
+    @classmethod
+    def _formatting_physical_entities_rel_results(cls, results: dict) -> str:
+        pass
 
 
