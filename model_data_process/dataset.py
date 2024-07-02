@@ -6,6 +6,7 @@ import ast
 
 from utils.preprocessing import NewVersionDialogues
 from settings import DATASET_CACHE_PATH
+from model_data_process.knowledge_generator import KnowledgeGenerator
 
 
 class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
@@ -51,6 +52,10 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
     CACHE_PATH = DATASET_CACHE_PATH
     DATASET_NAME = "empatheticdialogues"
 
+    SOCIAL_REL_KEY_NAME = 'social_rel'
+    EVENT_REL_KEY_NAME = 'event_rel'
+    ENTITY_REL_KEY_NAME = 'entity_rel'
+
     def __init__(self, split='train', transform=None):
         """
         initial of dataset
@@ -62,10 +67,11 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         self.n_sample = len(self.data)
 
     @classmethod
-    def _conv_preprocess(cls, split: str) -> list:
+    def _conv_preprocess(cls, split: str, add_knowledge: bool = True) -> list:
         """
         change the format of dataset
         :param split: train/test/validation
+        :param add_knowledge: add knowledge to each conversation
         :return: dataset with new format
         """
         if os.path.exists(f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"):
@@ -88,6 +94,9 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                                                   label_key_name='label')
             data = process_manager.reformat(raw_dataset=raw_dataset)
 
+            if add_knowledge:
+                data = cls._add_knowledge_to_conv(dataset=data)
+
             # save dataset on cache'_
             file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}".replace("[", "_").replace(":", "_").replace("]", "_")
             if not os.path.exists(os.path.dirname(file_path)):
@@ -101,17 +110,44 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
 
             return data
 
+    @classmethod
+    def _add_knowledge_to_conv(cls, dataset):
+        """
+        add knowledge to dataset
+        :param dataset:
+        :return:
+        """
+        knw_added_dataset = list()
+
+        for record in dataset:
+            social, event, entity = KnowledgeGenerator.run(texts=record['history'])
+            record_plus_knw = {cls.SOCIAL_REL_KEY_NAME: social,
+                               cls.EVENT_REL_KEY_NAME: event,
+                               cls.ENTITY_REL_KEY_NAME: entity}
+            record_plus_knw.update(record)
+            knw_added_dataset.append(record)
+
+        return knw_added_dataset
+
     def __getitem__(self, idx: int):
         """
         get item with specific index using dataset[idx]
         :param idx: index
         :return:
         """
-        history, label, emotion_label = self.data[idx]['history'], self.data[idx]['label'], self.data[idx]['context']
+        item_data = self.data[idx]
+        history, label, emotion_label = item_data['history'], item_data['label'], item_data['context']
         emotion_label = self.EmotionType[emotion_label].value
+        item_data = {'history': history, 'label': label, 'emotion_label': emotion_label}
+        if self.SOCIAL_REL_KEY_NAME in item_data.keys():
+            item_data.update({
+                self.SOCIAL_REL_KEY_NAME: item_data[self.SOCIAL_REL_KEY_NAME],
+                self.EVENT_REL_KEY_NAME: item_data[self.EVENT_REL_KEY_NAME],
+                self.ENTITY_REL_KEY_NAME: item_data[self.EVENT_REL_KEY_NAME]
+            })
         if self.transform:
-            return self.transform(({'history': history, 'label': label, 'emotion_label': emotion_label}))
-        return {'history': history, 'label': label, 'emotion_label': emotion_label}
+            return self.transform(item_data)
+        return item_data
 
     def __len__(self) -> int:
         """
