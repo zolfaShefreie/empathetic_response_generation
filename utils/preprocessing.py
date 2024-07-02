@@ -283,10 +283,12 @@ class KnowledgeFormatter:
                          'Desires': 'desires', }
 
     def __init__(self, social_rel_key_name: str = 'social_rel', event_rel_key_name: str = 'event_rel',
-                 entity_rel_key_name: str = 'entity_rel'):
+                 entity_rel_key_name: str = 'entity_rel',
+                 react_rel_key_name: str = 'react_rel'):
         self.social_rel_key_name = social_rel_key_name
         self.event_rel_key_name = event_rel_key_name
         self.entity_rel_key_name = entity_rel_key_name
+        self.react_rel_key_name = react_rel_key_name
 
     @staticmethod
     def _join_all_nodes_for_same_rel(nodes: list) -> str:
@@ -354,7 +356,7 @@ class KnowledgeFormatter:
         :return:
         """
         # apply social reformatting
-        sample[self.social_rel_key_name] = self._formatting_social_interaction_rel_results(sample[self.social_rel_key_name])
+        sample[self.react_rel_key_name], sample[self.social_rel_key_name] = self._formatting_social_interaction_rel_results(sample[self.social_rel_key_name])
 
         # apply other reformatting
         other_map_func = {rel_key_name: self._formatting_event_entity_rel_results
@@ -362,6 +364,65 @@ class KnowledgeFormatter:
                           if rel_key_name in sample.keys()}
 
         return {k: v if k not in other_map_func.keys() else other_map_func[k](v) for k, v in sample.items()}
+
+
+class KnowledgeTokenizer:
+    """works with dictionaries as input and output"""
+
+    def __init__(self,
+                 tokenizer,
+                 max_len=128,
+                 new_special_tokens=None,
+                 react_key_name: str = 'react_rel',
+                 social_rel_key_name: str = 'social_rel',
+                 event_rel_key_name: str = 'event_rel',
+                 entity_rel_key_name: str = 'entity_rel'):
+        """
+        WARNING: key_names is used for prefix of result
+        :param tokenizer:
+        :param max_len:
+        :param new_special_tokens:
+        :param react_key_name:
+        :param social_rel_key_name:
+        :param event_rel_key_name:
+        :param entity_rel_key_name:
+        """
+        self.tokenizer = tokenizer
+        self.tokenizer.truncation_side = 'left'
+
+        if new_special_tokens:
+            self.tokenizer.add_special_tokens(new_special_tokens)
+
+        self.MAX_LEN = max_len
+        # key_name configs
+        self.react_key_name = react_key_name
+        self.social_rel_key_name = social_rel_key_name
+        self.event_rel_key_name = event_rel_key_name
+        self.entity_rel_key_name = entity_rel_key_name
+
+    def __call__(self, sample):
+        """
+        warning make sure to apply ToNumpy before using this function
+        :param sample:
+        :return:
+        """
+        data = dict()
+        for key_name in [self.react_key_name, self.social_rel_key_name,
+                         self.event_rel_key_name, self.entity_rel_key_name]:
+            if key_name in sample.keys():
+                inputs = self.tokenizer.encode_plus(sample[key_name][0],
+                                                    add_special_tokens=True,
+                                                    max_length=self.MAX_LEN,
+                                                    padding='max_length',
+                                                    return_attention_mask=True,
+                                                    return_token_type_ids=True,
+                                                    truncation=True)
+                data[f"{key_name}_input_ids"] = inputs['input_ids']
+                data[f"{key_name}_attention_mask"] = inputs['attention_mask']
+                data[f"{key_name}_token_type_ids"] = inputs['token_type_ids']
+
+        data.update(sample)
+        return data
 
 
 class ToTensor:
