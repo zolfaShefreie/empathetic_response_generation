@@ -563,7 +563,7 @@ class ConvertInputToDict:
         return {key: sample[index] for key, index in self.dict_meta_data.items()}
 
 
-class PreProcessEncoderDecoderInputTupleVerstion:
+class PreProcessEncoderDecoderInputTupleVersion:
     # it is coded based on output of ConversationTokenizer class
     OUTPUT_KEYS = {'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
                    'decoder_input_ids': 3, 'decoder_attention_mask': 4, 'labels': 3}
@@ -596,7 +596,7 @@ class PreProcessEncoderDecoderInputTupleVerstion:
         return data
 
 
-class PreProcessEncoderDecoderInputDictVerstion:
+class PreProcessEncoderDecoderInputDictVersion:
 
     def __init__(self, tokenizer, gen_label_key_name: str):
         """

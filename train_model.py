@@ -1,7 +1,7 @@
 from utils.interface import BaseInterface
 from model_data_process.dataset import EmpatheticDialoguesDataset
 from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTokenizer, TextCleaner, ToTensor, \
-    PreProcessEncoderDecoderInput, ToLong
+    ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion
 from model_data_process import models
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_MODEL_ID
 from utils.callbacks import SaveHistoryCallback
@@ -9,7 +9,7 @@ from utils.metrics import Metrics
 from utils.trainer import MultiTaskTrainer
 
 from transformers import RobertaTokenizer, Seq2SeqTrainingArguments, Seq2SeqTrainer, DefaultFlowCallback, \
-    EarlyStoppingCallback, trainer_utils
+    EarlyStoppingCallback, trainer_utils, AlbertTokenizer
 import argparse
 
 
@@ -117,16 +117,38 @@ class TrainInterface(BaseInterface):
                                                       'additional_special_tokens': [
                                                           ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
                                                       'pad_token': '[PAD]'},
-                                                   train_split=True)
+                                                   last_utter_key_name='last_utter',
+                                                   history_key_name='history',
+                                                   gen_label_key_name='label',
+                                                   context_ids_key_name='input_ids',
+                                                   context_mask_key_name='attention_mask',
+                                                   context_token_type_key_name='token_type_ids',
+                                                   gen_label_ids_key_name='labels')
+
+    KNOWLEDGE_TOKENIZER = KnowledgeTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
+                                             react_key_name='react-rel',
+                                             social_rel_key_name='social_rel',
+                                             event_rel_key_name='event_rel',
+                                             entity_rel_key_name='entity_rel')
 
     TRANSFORMS = Pipeline(functions=[
         TextCleaner(have_label=True),
-        ConversationFormatter(train_split=True),
+        ConversationFormatter(history_key_name='history',
+                              gen_label_key_name='label',
+                              last_utter_key_name='last_utter'),
+        KnowledgeFormatter(social_rel_key_name='social_rel',
+                           event_rel_key_name='event_rel',
+                           entity_rel_key_name='entity_rel',
+                           react_rel_key_name='react_rel'),
+        ToNumpy(),
         CONVERSATION_TOKENIZER,
+        KNOWLEDGE_TOKENIZER,
         ToTensor(),
-        PreProcessEncoderDecoderInput(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
-                                      dict_meta_data={'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
-                                                      'labels': 3, 'emotion_labels': 6}),
+        FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
+                     [f"{rel_name}_suffix" for rel_name in ['react-rel', 'social_rel', 'event_rel', 'entity_rel']
+                      for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
+        PreProcessEncoderDecoderInputDictVersion(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
+                                                 gen_label_key_name='labels'),
         ToLong(),
     ])
 
