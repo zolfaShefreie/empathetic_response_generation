@@ -1,6 +1,8 @@
 from abc import ABC
+
+import torch.nn
 from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, EncoderDecoderModel, EncoderDecoderConfig,\
-    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
+    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification, AlbertModel
 import enum
 
 from utils.models import MultiTaskModel, BaseMultiTaskOutput
@@ -112,6 +114,54 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
         config.num_beams = 4
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
+
+
+class KnowledgeEncoder(PreTrainedModel):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.encoder = AlbertModel.from_pretrained("albert-base-v2")
+        self.social_cross_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=5, dropout=0.2)
+        self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=10, dropout=0.2)
+        self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=10, dropout=0.2)
+
+    def forward(self, react_rel_input_ids, react_rel_attention_mask, react_rel_token_type_ids,
+                social_rel_input_ids, social_rel_attention_mask, social_rel_token_type_ids, event_rel_input_ids,
+                event_rel_attention_mask,
+                event_rel_token_type_ids,
+                entity_rel_input_ids,
+                entity_rel_attention_mask,
+                entity_rel_token_type_ids, *args, **kwargs):
+        # todo: check the output of cross attention
+        # todo: arguments correct them (type, default)
+
+        encoded_react_knw = self.encoder(input_ids=react_rel_input_ids,
+                                         attention_mask=react_rel_attention_mask,
+                                         token_type_ids=react_rel_token_type_ids)[0]
+
+        encoded_social_knw = self.encoder(input_ids=social_rel_input_ids,
+                                          attention_mask=social_rel_attention_mask,
+                                          token_type_ids=social_rel_token_type_ids)[0]
+
+        encoded_event_knw = self.encoder(input_ids=event_rel_input_ids,
+                                         attention_mask=event_rel_attention_mask,
+                                         token_type_ids=event_rel_token_type_ids)[0]
+
+        encoded_entity_knw = self.encoder(input_ids=entity_rel_input_ids,
+                                          attention_mask=entity_rel_attention_mask,
+                                          token_type_ids=entity_rel_token_type_ids)[0]
+
+        social_react_attention_output = self.social_cross_attention(query=encoded_react_knw, key=encoded_social_knw,
+                                                             value=encoded_social_knw)
+
+        social_event_attention_output = self.social_event_attention(query=social_react_attention_output, key=encoded_event_knw,
+                                                             value=encoded_event_knw)
+
+        social_entity_attention_output = self.social_entity_attention(query=social_react_attention_output, key=encoded_entity_knw,
+                                                                      value=encoded_entity_knw)
+
+        return social_react_attention_output + social_event_attention_output + social_entity_attention_output
+
 
 
 class Roberta2DialoGPT(EncoderDecoderModel, ABC):

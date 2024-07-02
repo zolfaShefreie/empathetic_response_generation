@@ -145,7 +145,7 @@ class TrainInterface(BaseInterface):
         KNOWLEDGE_TOKENIZER,
         ToTensor(),
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
-                     [f"{rel_name}_suffix" for rel_name in ['react-rel', 'social_rel', 'event_rel', 'entity_rel']
+                     [f"{rel_name}_suffix" for rel_name in ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
                       for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         PreProcessEncoderDecoderInputDictVersion(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
                                                  gen_label_key_name='labels'),
