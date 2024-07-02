@@ -223,12 +223,16 @@ class TextCleaner:
 class ConversationFormatter:
     """
     join utterance with special tokens
+    works with dictionaries as input and output
     """
 
     SPECIAL_TOKEN_SPLIT_UTTERANCE = "<USEP>"
 
-    def __init__(self, train_split=True):
-        self.train_split = train_split
+    def __init__(self, history_key_name: str = 'history', gen_label_key_name: str = 'label',
+                 last_utter_key_name: str = 'last_utter'):
+        self.history_key_name = history_key_name
+        self.gen_label_key_name = gen_label_key_name
+        self.last_utter_key_name = last_utter_key_name
 
     def __call__(self, sample):
         """
@@ -236,21 +240,29 @@ class ConversationFormatter:
         :param sample:
         :return: context, last utterance, response
         """
-        texts = sample[0] if self.train_split else sample
+        texts = sample[self.history_key_name]
 
         last_utter = texts[-1]
         conversation = f"{self.SPECIAL_TOKEN_SPLIT_UTTERANCE}".join(texts[:-1])
+        sample[self.history_key_name] = conversation
+        sample[self.last_utter_key_name] = last_utter
 
-        if self.train_split:
-            labels = tuple([np.array(each)
-                            if isinstance(each, list) or isinstance(each, int) or isinstance(each, np.ndarray)
-                            else np.array([each]) for each in sample[1:]])
-            return (np.array([conversation]), np.array([last_utter])) + labels
-        else:
-            return np.array([conversation]), np.array([last_utter])
+        return sample
+
+
+class ToNumpy:
+
+    def __call__(self, sample):
+        if isinstance(sample, dict):
+            return {k: np.array(v) if isinstance(v, list) or isinstance(v, int) or isinstance(v, np.ndarray)
+                    else np.array([v]) for k, v in sample.items()}
+
+        return tuple([np.array(v) if isinstance(v, list) or isinstance(v, int) or isinstance(v, np.ndarray)
+                      else np.array([v]) for v in sample])
 
 
 class KnowledgeFormatter:
+    """works with dictionaries as input and output"""
 
     # same as knowledge generator
     SOCIAL_INTERACTION_REL = {'xIntent': 'because X wanted',
@@ -270,10 +282,11 @@ class KnowledgeFormatter:
                          'HasProperty': 'can be characterized by being/having',
                          'Desires': 'desires', }
 
-    def __init__(self, social_rel_pos: int, event_rel_pos: int = None, entity_rel_pos: int = None):
-        self.social_rel_pos = social_rel_pos
-        self.event_rel_pos = event_rel_pos
-        self.entity_rel_pos = entity_rel_pos
+    def __init__(self, social_rel_key_name: str = 'social_rel', event_rel_key_name: str = 'event_rel',
+                 entity_rel_key_name: str = 'entity_rel'):
+        self.social_rel_key_name = social_rel_key_name
+        self.event_rel_key_name = event_rel_key_name
+        self.entity_rel_key_name = entity_rel_key_name
 
     @staticmethod
     def _join_all_nodes_for_same_rel(nodes: list) -> str:
@@ -334,21 +347,21 @@ class KnowledgeFormatter:
                            for text, rel_nodes in results.items()
                            for rel_name, nodes in rel_nodes.items()])
 
-    def __call__(self, sample) -> tuple:
+    def __call__(self, sample) -> dict:
         """
         apply reformatting for knowledge
         :param sample:
         :return:
         """
         # apply social reformatting
-        sample[self.social_rel_pos] = self._formatting_social_interaction_rel_results(sample[self.social_rel_pos])
+        sample[self.social_rel_key_name] = self._formatting_social_interaction_rel_results(sample[self.social_rel_key_name])
 
         # apply other reformatting
-        other_map_func = {rel_pos: self._formatting_event_entity_rel_results
-                          for rel_pos in [self.event_rel_pos, self.entity_rel_pos]
-                          if rel_pos is not None}
-        return tuple([sample[i] if i not in other_map_func.keys() else other_map_func[i](sample[i])
-                      for i in range(len(sample))])
+        other_map_func = {rel_key_name: self._formatting_event_entity_rel_results
+                          for rel_key_name in [self.event_rel_key_name, self.event_rel_key_name]
+                          if rel_key_name in sample.keys()}
+
+        return {k: v if k not in other_map_func.keys() else other_map_func[k](v) for k, v in sample.items()}
 
 
 class ToTensor:
@@ -357,6 +370,8 @@ class ToTensor:
     """
 
     def __call__(self, sample):
+        if isinstance(sample, dict):
+            return {k: torch.from_numpy(np.array(v)) for k, v in sample.items()}
         return tuple(torch.from_numpy(np.array(each)) for each in sample)
 
 
@@ -369,13 +384,35 @@ class ToLong:
 
 
 class ConversationTokenizer:
+    """works with dictionaries as input and output"""
 
-    def __init__(self, tokenizer, train_split=True, max_len=128, new_special_tokens=None):
+    def __init__(self,
+                 tokenizer,
+                 max_len=128,
+                 new_special_tokens=None,
+                 last_utter_key_name: str = 'last_utter',
+                 history_key_name: str = 'history',
+                 gen_label_key_name: str = 'label',
+                 context_ids_key_name: str = 'input_ids',
+                 context_mask_key_name: str = 'attention_mask',
+                 context_token_type_key_name: str = 'token_type_ids',
+                 gen_label_ids_key_name: str = 'labels',
+                 gen_label_mask_key_name: str = 'gen_label_mask',
+                 gen_label_token_type_key_name: str = 'gen_label_token_type',):
         """
+
         :param tokenizer:
-        :param train_split:
         :param max_len:
         :param new_special_tokens:
+        :param last_utter_key_name:
+        :param history_key_name:
+        :param gen_label_key_name:
+        :param context_ids_key_name:
+        :param context_mask_key_name:
+        :param context_token_type_key_name:
+        :param gen_label_ids_key_name:
+        :param gen_label_mask_key_name:
+        :param gen_label_token_type_key_name:
         """
         self.tokenizer = tokenizer
         self.tokenizer.truncation_side = 'left'
@@ -383,15 +420,25 @@ class ConversationTokenizer:
         if new_special_tokens:
             self.tokenizer.add_special_tokens(new_special_tokens)
 
-        self.train_split = train_split
         self.MAX_LEN = max_len
+        # key_name configs
+        self.history_key_name = history_key_name
+        self.gen_label_key_name = gen_label_key_name
+        self.last_utter_key_name = last_utter_key_name
+        self.context_ids_key_name = context_ids_key_name
+        self.context_mask_key_name = context_mask_key_name
+        self.context_token_type_key_name = context_token_type_key_name
+        self.gen_label_ids_key_name = gen_label_ids_key_name
+        self.gen_label_mask_key_name = gen_label_mask_key_name
+        self.gen_label_token_type_key_name = gen_label_token_type_key_name
 
     def __call__(self, sample):
         """
+        warning make sure to apply ToNumpy before using this function
         :param sample: get context, last_utter and response (response is optional)
         :return:
         """
-        inputs = self.tokenizer.encode_plus(sample[0][0], sample[1][0],
+        inputs = self.tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
                                             add_special_tokens=True,
                                             max_length=self.MAX_LEN,
                                             padding='max_length',
@@ -399,18 +446,41 @@ class ConversationTokenizer:
                                             return_token_type_ids=True,
                                             truncation=True)
 
-        if self.train_split:
-            label = self.tokenizer.encode_plus(sample[2][0],
+        sample[self.context_ids_key_name] = inputs['input_ids']
+        sample[self.context_mask_key_name] = inputs['attention_mask']
+        sample[self.context_token_type_key_name] = inputs['token_type_ids']
+
+        if self.gen_label_key_name in sample.keys():
+            label = self.tokenizer.encode_plus(sample[self.gen_label_key_name][0],
                                                add_special_tokens=True,
                                                max_length=self.MAX_LEN,
                                                padding='max_length',
                                                return_attention_mask=True,
                                                return_token_type_ids=True,
                                                truncation=True)
-            return (inputs['input_ids'], inputs['attention_mask'], inputs['token_type_ids'],
-                   label['input_ids'], label['attention_mask'], label['token_type_ids']) + tuple(sample[3:])
-        else:
-            return inputs['input_ids'], inputs['attention_mask'], inputs['token_type_ids']
+            sample[self.gen_label_ids_key_name] = label['input_ids']
+            sample[self.gen_label_mask_key_name] = label['attention_mask']
+            sample[self.gen_label_token_type_key_name] = label['token_type_ids']
+
+        return sample
+
+
+class FilterSample:
+
+    def __init__(self, wanted_keys: list):
+        """
+
+        :param wanted_keys:
+        """
+        self.wanted_keys = wanted_keys
+
+    def __call__(self, sample):
+        """
+
+        :param sample:
+        :return:
+        """
+        return {k: v for k, v in sample.items() if k in self.wanted_keys}
 
 
 class ConvertInputToDict:
@@ -432,7 +502,7 @@ class ConvertInputToDict:
         return {key: sample[index] for key, index in self.dict_meta_data.items()}
 
 
-class PreProcessEncoderDecoderInput:
+class PreProcessEncoderDecoderInputTupleVerstion:
     # it is coded based on output of ConversationTokenizer class
     OUTPUT_KEYS = {'input_ids': 0, 'attention_mask': 1, 'token_type_ids': 2,
                    'decoder_input_ids': 3, 'decoder_attention_mask': 4, 'labels': 3}
@@ -463,3 +533,28 @@ class PreProcessEncoderDecoderInput:
 
         data = {key: torch.from_numpy(np.array(value)) for key, value in data.items()}
         return data
+
+
+class PreProcessEncoderDecoderInputDictVerstion:
+
+    def __init__(self, tokenizer, gen_label_key_name: str):
+        """
+        :param tokenizer:
+        :param gen_label_key_name:
+        """
+        self.gen_label_key_name = gen_label_key_name
+        self.tokenizer = tokenizer
+
+    def __call__(self, sample) -> dict:
+        """
+        convert it to dictionary format
+        :param sample:
+        :return:
+        """
+
+        if self.gen_label_key_name in sample:
+            sample[self.gen_label_key_name] = [
+                -100 if token == self.tokenizer.pad_token_id else token for token in sample[self.gen_label_key_name]
+            ]
+
+        return sample

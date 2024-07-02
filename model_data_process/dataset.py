@@ -110,8 +110,8 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         history, label, emotion_label = self.data[idx]['history'], self.data[idx]['label'], self.data[idx]['context']
         emotion_label = self.EmotionType[emotion_label].value
         if self.transform:
-            return self.transform((history, label, emotion_label))
-        return history, label, emotion_label
+            return self.transform(({'history': history, 'label': label, 'emotion_label': emotion_label}))
+        return {'history': history, 'label': label, 'emotion_label': emotion_label}
 
     def __len__(self) -> int:
         """
