@@ -2,8 +2,13 @@ from abc import ABC
 import torch.nn
 from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, EncoderDecoderModel, EncoderDecoderConfig,\
     AutoConfig, PreTrainedModel, AutoModelForSequenceClassification, AlbertModel
+import warnings
 import enum
-from typing import Optional
+from typing import Optional, Tuple, Union
+from torch.nn import CrossEntropyLoss
+from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
+from transformers.models.encoder_decoder.modeling_encoder_decoder import DEPRECATION_WARNING, shift_tokens_right
+
 
 from utils.models import MultiTaskModel, BaseMultiTaskOutput
 
@@ -186,7 +191,7 @@ class KnowledgesEncoder(PreTrainedModel):
                                        social_entity_attention_output]), dim=-1) + encoded_react_knw
 
 
-class Roberta2DialoGPT(EncoderDecoderModel, ABC):
+class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
     """
     it isn't necessary to make a new class,
     this class is written to change lately on initial and forward functions
@@ -234,6 +239,129 @@ class Roberta2DialoGPT(EncoderDecoderModel, ABC):
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
+        self.knowledge_encoder = KnowledgesEncoder()
+
+    def forward(self,
+                input_ids: Optional[torch.LongTensor] = None,
+                attention_mask: Optional[torch.FloatTensor] = None,
+                decoder_input_ids: Optional[torch.LongTensor] = None,
+                decoder_attention_mask: Optional[torch.BoolTensor] = None,
+                encoder_outputs: Optional[Tuple[torch.FloatTensor]] = None,
+                past_key_values: Tuple[Tuple[torch.FloatTensor]] = None,
+                inputs_embeds: Optional[torch.FloatTensor] = None,
+                decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
+                labels: Optional[torch.LongTensor] = None,
+                use_cache: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None,
+                react_rel_input_ids: Optional[torch.LongTensor] = None,
+                react_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                react_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                social_rel_input_ids: Optional[torch.LongTensor] = None,
+                social_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                social_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                event_rel_input_ids: Optional[torch.LongTensor] = None,
+                event_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                event_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                entity_rel_input_ids: Optional[torch.LongTensor] = None,
+                entity_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                entity_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                **kwargs) -> Union[Tuple, Seq2SeqLMOutput]:
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        kwargs_encoder = {argument: value for argument, value in kwargs.items() if not argument.startswith("decoder_")}
+
+        kwargs_decoder = {
+            argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
+        }
+
+        if encoder_outputs is None:
+            encoder_outputs = self.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                **kwargs_encoder,
+            )
+        elif isinstance(encoder_outputs, tuple):
+            encoder_outputs = BaseModelOutput(*encoder_outputs)
+
+        encoder_hidden_states = encoder_outputs[0]
+
+        encoded_knowledge = self.knowledge_encoder(
+            react_rel_input_ids=react_rel_input_ids,
+            react_rel_attention_mask=react_rel_attention_mask,
+            react_rel_token_type_ids=react_rel_token_type_ids,
+            social_rel_input_ids=social_rel_input_ids,
+            social_rel_attention_mask=social_rel_attention_mask,
+            social_rel_token_type_ids=social_rel_token_type_ids,
+            event_rel_input_ids=event_rel_input_ids,
+            event_rel_attention_mask=event_rel_attention_mask,
+            event_rel_token_type_ids=event_rel_token_type_ids,
+            entity_rel_input_ids=entity_rel_input_ids,
+            entity_rel_attention_mask=entity_rel_attention_mask,
+            entity_rel_token_type_ids=entity_rel_token_type_ids
+        )
+
+        knw_plus_encoder_hidden_state = torch.sum(torch.stack([encoder_hidden_states, encoded_knowledge]))
+
+        # optionally project encoder_hidden_states
+        if (
+                self.encoder.config.hidden_size != self.decoder.config.hidden_size
+                and self.decoder.config.cross_attention_hidden_size is None
+        ):
+            knw_plus_encoder_hidden_state = self.enc_to_dec_proj(knw_plus_encoder_hidden_state)
+
+        if (labels is not None) and (decoder_input_ids is None and decoder_inputs_embeds is None):
+            decoder_input_ids = shift_tokens_right(
+                labels, self.config.pad_token_id, self.config.decoder_start_token_id
+            )
+
+        # Decode
+        decoder_outputs = self.decoder(
+            input_ids=decoder_input_ids,
+            attention_mask=decoder_attention_mask,
+            encoder_hidden_states=knw_plus_encoder_hidden_state,
+            encoder_attention_mask=attention_mask,
+            inputs_embeds=decoder_inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
+            return_dict=return_dict,
+            **kwargs_decoder,
+        )
+
+        # Compute loss independent from decoder (as some shift the logits inside them)
+        loss = None
+        if labels is not None:
+            warnings.warn(DEPRECATION_WARNING, FutureWarning)
+            logits = decoder_outputs.logits if return_dict else decoder_outputs[0]
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.reshape(-1, self.decoder.config.vocab_size), labels.view(-1))
+
+        if not return_dict:
+            if loss is not None:
+                return (loss,) + decoder_outputs + encoder_outputs
+            else:
+                return decoder_outputs + encoder_outputs
+
+        return Seq2SeqLMOutput(
+            loss=loss,
+            logits=decoder_outputs.logits,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+            encoder_hidden_states=encoder_outputs.hidden_states,
+            encoder_attentions=encoder_outputs.attentions,
+        )
+
 
 class EmotionRoberta2DialoGPT(MultiTaskModel):
 
@@ -264,11 +392,11 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
 
             WARNING: if you doesn't put tasks correctly in dict the model doesn't run the task for training and testing
         """
-        self.encoder_decoder = Roberta2DialoGPT(bos_token_id=kwargs['bos_token_id'],
-                                                eos_token_id=kwargs['eos_token_id'],
-                                                pad_token_id=kwargs['pad_token_id'],
-                                                config=kwargs['encoder_decoder_config'],
-                                                embedding_tokens_len=kwargs['embedding_tokens_len'])
+        self.encoder_decoder = KnowledgeRoberta2DialoGPT(bos_token_id=kwargs['bos_token_id'],
+                                                         eos_token_id=kwargs['eos_token_id'],
+                                                         pad_token_id=kwargs['pad_token_id'],
+                                                         config=kwargs['encoder_decoder_config'],
+                                                         embedding_tokens_len=kwargs['embedding_tokens_len'])
 
         self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",
                                                                                      num_labels=kwargs['num_labels'])
@@ -334,6 +462,18 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 'use_cache': 'use_cache',
                 'output_attentions': 'output_attentions',
                 'output_hidden_states': 'output_hidden_states',
+                'react_rel_input_ids': 'react_rel_input_ids',
+                'react_rel_attention_mask': 'react_rel_attention_mask',
+                'react_rel_token_type_ids': 'react_rel_token_type_ids',
+                'social_rel_input_ids': 'social_rel_input_ids',
+                'social_rel_attention_mask': 'social_rel_attention_mask',
+                'social_rel_token_type_ids': 'social_rel_token_type_ids',
+                'event_rel_input_ids': 'event_rel_input_ids',
+                'event_rel_attention_mask': 'event_rel_attention_mask',
+                'event_rel_token_type_ids': 'event_rel_token_type_ids',
+                'entity_rel_input_ids': 'entity_rel_input_ids',
+                'entity_rel_attention_mask': 'entity_rel_attention_mask',
+                'entity_rel_token_type_ids': 'entity_rel_token_type_ids'
             },
 
             'emotion_classifier': {
