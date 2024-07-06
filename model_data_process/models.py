@@ -287,34 +287,39 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
                 return_dict=return_dict,
                 **kwargs_encoder,
             )
+
+            encoded_knowledge = self.knowledge_encoder(
+                react_rel_input_ids=react_rel_input_ids,
+                react_rel_attention_mask=react_rel_attention_mask,
+                react_rel_token_type_ids=react_rel_token_type_ids,
+                social_rel_input_ids=social_rel_input_ids,
+                social_rel_attention_mask=social_rel_attention_mask,
+                social_rel_token_type_ids=social_rel_token_type_ids,
+                event_rel_input_ids=event_rel_input_ids,
+                event_rel_attention_mask=event_rel_attention_mask,
+                event_rel_token_type_ids=event_rel_token_type_ids,
+                entity_rel_input_ids=entity_rel_input_ids,
+                entity_rel_attention_mask=entity_rel_attention_mask,
+                entity_rel_token_type_ids=entity_rel_token_type_ids
+            )
+
+            # update encoder output
+            if isinstance(encoder_outputs, tuple):
+                encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_knowledge]), dim=0)
+            else:
+                encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
+                                                                              encoded_knowledge]), dim=0)
         elif isinstance(encoder_outputs, tuple):
             encoder_outputs = BaseModelOutput(*encoder_outputs)
 
         encoder_hidden_states = encoder_outputs[0]
-
-        encoded_knowledge = self.knowledge_encoder(
-            react_rel_input_ids=react_rel_input_ids,
-            react_rel_attention_mask=react_rel_attention_mask,
-            react_rel_token_type_ids=react_rel_token_type_ids,
-            social_rel_input_ids=social_rel_input_ids,
-            social_rel_attention_mask=social_rel_attention_mask,
-            social_rel_token_type_ids=social_rel_token_type_ids,
-            event_rel_input_ids=event_rel_input_ids,
-            event_rel_attention_mask=event_rel_attention_mask,
-            event_rel_token_type_ids=event_rel_token_type_ids,
-            entity_rel_input_ids=entity_rel_input_ids,
-            entity_rel_attention_mask=entity_rel_attention_mask,
-            entity_rel_token_type_ids=entity_rel_token_type_ids
-        )
-
-        knw_plus_encoder_hidden_state = torch.sum(torch.stack([encoder_hidden_states, encoded_knowledge]), dim=0)
 
         # optionally project encoder_hidden_states
         if (
                 self.encoder.config.hidden_size != self.decoder.config.hidden_size
                 and self.decoder.config.cross_attention_hidden_size is None
         ):
-            knw_plus_encoder_hidden_state = self.enc_to_dec_proj(knw_plus_encoder_hidden_state)
+            encoder_hidden_states = self.enc_to_dec_proj(encoder_hidden_states)
 
         if (labels is not None) and (decoder_input_ids is None and decoder_inputs_embeds is None):
             decoder_input_ids = shift_tokens_right(
@@ -325,7 +330,7 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=knw_plus_encoder_hidden_state,
+            encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=attention_mask,
             inputs_embeds=decoder_inputs_embeds,
             output_attentions=output_attentions,
@@ -497,9 +502,26 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
         return self.TASK_CONFIG[self.get_generative_task_id()].get_encoder()
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None,
-                emotion_labels=None, labels=None,  **kwargs) -> BaseMultiTaskOutput:
+                emotion_labels=None, labels=None, react_rel_input_ids=None,
+                react_rel_attention_mask=None, react_rel_token_type_ids=None, social_rel_input_ids=None,
+                social_rel_attention_mask=None, social_rel_token_type_ids=None, event_rel_input_ids=None,
+                event_rel_attention_mask=None, event_rel_token_type_ids=None, entity_rel_input_ids=None,
+                entity_rel_attention_mask=None, entity_rel_token_type_ids=None,
+                **kwargs) -> BaseMultiTaskOutput:
         """
-        rewrite this function to show its arguments and avoid empty batch Error
+        rewrite this function to show its arguments and avoid empty batch Error for all arguments
+        :param entity_rel_token_type_ids:
+        :param entity_rel_attention_mask:
+        :param entity_rel_input_ids:
+        :param event_rel_token_type_ids:
+        :param event_rel_attention_mask:
+        :param event_rel_input_ids:
+        :param social_rel_token_type_ids:
+        :param social_rel_attention_mask:
+        :param social_rel_input_ids:
+        :param react_rel_token_type_ids:
+        :param react_rel_attention_mask:
+        :param react_rel_input_ids:
         :param input_ids:
         :param attention_mask:
         :param token_type_ids:
@@ -509,4 +531,15 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
         :return:
         """
         return super().forward(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
-                               emotion_labels=emotion_labels, labels=labels, **kwargs)
+                               emotion_labels=emotion_labels, labels=labels, react_rel_input_ids=react_rel_input_ids,
+                               react_rel_attention_mask=react_rel_attention_mask,
+                               react_rel_token_type_ids=react_rel_token_type_ids,
+                               social_rel_input_ids=social_rel_input_ids,
+                               social_rel_attention_mask=social_rel_attention_mask,
+                               social_rel_token_type_ids=social_rel_token_type_ids,
+                               event_rel_input_ids=event_rel_input_ids,
+                               event_rel_attention_mask=event_rel_attention_mask,
+                               event_rel_token_type_ids=event_rel_token_type_ids,
+                               entity_rel_input_ids=entity_rel_input_ids,
+                               entity_rel_attention_mask=entity_rel_attention_mask,
+                               entity_rel_token_type_ids=entity_rel_token_type_ids, **kwargs)

@@ -138,7 +138,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         raw_item_data = self.data[idx]
         history, label, emotion_label = raw_item_data['history'], raw_item_data['label'], raw_item_data['context']
         emotion_label = self.EmotionType[emotion_label].value
-        item_data = {'history': history, 'label': label, 'emotion_label': emotion_label}
+        item_data = {'history': history, 'label': label, 'emotion_labels': emotion_label}
         if self.SOCIAL_REL_KEY_NAME in raw_item_data.keys():
             item_data.update({
                 self.SOCIAL_REL_KEY_NAME: raw_item_data[self.SOCIAL_REL_KEY_NAME],

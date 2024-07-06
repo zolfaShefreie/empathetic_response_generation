@@ -126,11 +126,11 @@ class TrainInterface(BaseInterface):
                                                    gen_label_ids_key_name='labels')
 
     KNOWLEDGE_TOKENIZER = KnowledgeTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
-                                             react_key_name='react-rel',
+                                             react_key_name='react_rel',
                                              social_rel_key_name='social_rel',
                                              event_rel_key_name='event_rel',
                                              entity_rel_key_name='entity_rel',
-                                             max_len=200)
+                                             max_len=300)
 
     TRANSFORMS = Pipeline(functions=[
         TextCleaner(texts_key_name='history'),
