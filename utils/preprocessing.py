@@ -277,11 +277,13 @@ class KnowledgeFormatter:
 
     def __init__(self, social_rel_key_name: str = 'social_rel', event_rel_key_name: str = 'event_rel',
                  entity_rel_key_name: str = 'entity_rel',
-                 react_rel_key_name: str = 'react_rel'):
+                 react_rel_key_name: str = 'react_rel',
+                 use_special_tokens: bool = True):
         self.social_rel_key_name = social_rel_key_name
         self.event_rel_key_name = event_rel_key_name
         self.entity_rel_key_name = entity_rel_key_name
         self.react_rel_key_name = react_rel_key_name
+        self.use_special_tokens = use_special_tokens
 
     @staticmethod
     def _join_all_nodes_for_same_rel(nodes: list) -> str:
@@ -296,8 +298,7 @@ class KnowledgeFormatter:
             return nodes[0]
         return ", ".join(nodes[:-1]) + f" and {nodes[-1]}"
 
-    @classmethod
-    def _convert_nodes_with_rel(cls, nodes: list, rel: str, root_node: str = None) -> str:
+    def _convert_nodes_with_rel(self, nodes: list, rel: str, root_node: str = None) -> str:
         """
         make a text with root_node, rel, nodes
         :param nodes: nodes shows generated nodes
@@ -309,34 +310,35 @@ class KnowledgeFormatter:
             return str()
 
         readable_rel = None
-        for categories in [cls.SOCIAL_INTERACTION_REL, cls.PHYSICAL_ENTITIES, cls.EVENT_CENTERED_REL]:
+        for categories in [self.SOCIAL_INTERACTION_REL, self.PHYSICAL_ENTITIES, self.EVENT_CENTERED_REL]:
             if rel in categories.keys():
-                readable_rel = categories[rel]
-        return f"{root_node}{' ' if root_node is not None else ''}{readable_rel} {cls._join_all_nodes_for_same_rel(nodes)}"
+                if self.use_special_tokens:
+                    readable_rel = f"[{rel}]"
+                else:
+                    readable_rel = categories[rel]
+        return f"{root_node}{' ' if root_node is not None else ''}{readable_rel} {self._join_all_nodes_for_same_rel(nodes)}"
 
-    @classmethod
-    def _formatting_social_interaction_rel_results(cls, results: dict) -> tuple:
+    def _formatting_social_interaction_rel_results(self, results: dict) -> tuple:
         """
         return relations with text format
         :param results:
         :return: xreact results, other rel results
         """
         social_knw_result = list(results.values())[0]
-        other_rel_reformat = ".\n".join([cls._convert_nodes_with_rel(nodes=rel_nodes,
+        other_rel_reformat = ".\n".join([self._convert_nodes_with_rel(nodes=rel_nodes,
                                                                      rel=rel_name,
                                                                      root_node=None)
                                          for rel_name, rel_nodes in social_knw_result.items()
                                          if rel_name != 'xReact'])
         return ", ".join(social_knw_result['xReact']), other_rel_reformat
 
-    @classmethod
-    def _formatting_event_entity_rel_results(cls, results: dict) -> str:
+    def _formatting_event_entity_rel_results(self, results: dict) -> str:
         """
         return relations with text format
         :param results:
         :return: text version of these data
         """
-        return ".\n".join([cls._convert_nodes_with_rel(nodes=nodes,
+        return ".\n".join([self._convert_nodes_with_rel(nodes=nodes,
                                                        rel=rel_name,
                                                        root_node=text)
                            for text, rel_nodes in results.items()
@@ -369,7 +371,8 @@ class KnowledgeTokenizer:
                  react_key_name: str = 'react_rel',
                  social_rel_key_name: str = 'social_rel',
                  event_rel_key_name: str = 'event_rel',
-                 entity_rel_key_name: str = 'entity_rel'):
+                 entity_rel_key_name: str = 'entity_rel',
+                 use_special_tokens: bool = True):
         """
         WARNING: key_names is used for prefix of result
         :param tokenizer:
@@ -379,11 +382,27 @@ class KnowledgeTokenizer:
         :param social_rel_key_name:
         :param event_rel_key_name:
         :param entity_rel_key_name:
+        :param use_special_tokens:
         """
         self.tokenizer = tokenizer
         self.tokenizer.truncation_side = 'left'
 
-        if new_special_tokens:
+        if use_special_tokens:
+            new_tokens = {
+                'additional_special_tokens': [f"[{rel}]" for categories in [KnowledgeFormatter.SOCIAL_INTERACTION_REL,
+                                                                            KnowledgeFormatter.EVENT_CENTERED_REL,
+                                                                            KnowledgeFormatter.PHYSICAL_ENTITIES]
+                                              for rel in categories.keys()]
+            }
+            if new_special_tokens:
+                new_special_tokens['additional_special_tokens'] = new_tokens['additional_special_tokens'] + \
+                                                                  new_special_tokens.get('additional_special_tokens',
+                                                                                         list())
+                self.tokenizer.add_special_tokens(new_special_tokens)
+            else:
+                self.tokenizer.add_special_tokens(new_tokens)
+
+        if new_special_tokens and not use_special_tokens:
             self.tokenizer.add_special_tokens(new_special_tokens)
 
         self.MAX_LEN = max_len

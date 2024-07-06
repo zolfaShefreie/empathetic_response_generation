@@ -130,7 +130,8 @@ class TrainInterface(BaseInterface):
                                              social_rel_key_name='social_rel',
                                              event_rel_key_name='event_rel',
                                              entity_rel_key_name='entity_rel',
-                                             max_len=300)
+                                             max_len=300,
+                                             use_special_tokens=True)
 
     TRANSFORMS = Pipeline(functions=[
         TextCleaner(texts_key_name='history'),
@@ -140,7 +141,8 @@ class TrainInterface(BaseInterface):
         KnowledgeFormatter(social_rel_key_name='social_rel',
                            event_rel_key_name='event_rel',
                            entity_rel_key_name='entity_rel',
-                           react_rel_key_name='react_rel'),
+                           react_rel_key_name='react_rel',
+                           use_special_tokens=True),
         ToNumpy(),
         CONVERSATION_TOKENIZER,
         KNOWLEDGE_TOKENIZER,
@@ -210,7 +212,8 @@ class TrainInterface(BaseInterface):
                                 bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
                                 eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
                                 pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
-                                num_labels=32)
+                                num_labels=32,
+                                kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer))
 
         trainer = MultiTaskTrainer(
             model=model,

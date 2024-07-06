@@ -123,9 +123,11 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
 
 class KnowledgesEncoder(PreTrainedModel):
 
-    def __init__(self, config: PretrainedConfig = PretrainedConfig(), *args, **kwargs):
-        super().__init__(config=config ,*args, **kwargs)
+    def __init__(self, kwn_embedding_tokens_len=50266, config: PretrainedConfig = PretrainedConfig(), *args, **kwargs):
+        super().__init__(config=config, *args, **kwargs)
+        print(kwn_embedding_tokens_len, 'kwn_embedding_tokens_len')
         self.encoder = AlbertModel.from_pretrained("albert-base-v2")
+        self.encoder.resize_token_embeddings(kwn_embedding_tokens_len)
         self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
         self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
 
@@ -199,6 +201,7 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
 
     def __init__(self, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  config: PretrainedConfig = None, embedding_tokens_len=50267,
+                 kwn_embedding_tokens_len=50266,
                  *inputs, **kwargs):
         """
         set encoder and decoder for Roberta-DialoGPT seq2seq model
@@ -239,7 +242,7 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
-        self.knowledge_encoder = KnowledgesEncoder()
+        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
 
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
@@ -378,6 +381,7 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
         kwargs['eos_token_id'] = kwargs.get('eos_token_id', 2)
         kwargs['pad_token_id'] = kwargs.get('pad_token_id', 50266)
         kwargs['embedding_tokens_len'] = kwargs.get('embedding_tokens_len', 50267)
+        kwargs['kwn_embedding_tokens_len'] = kwargs.get('kwn_embedding_tokens_len', 50266)
         kwargs['num_labels'] = kwargs.get('num_labels', 32)
         kwargs['encoder_decoder_config'] = kwargs.get('encoder_decoder_config', None)
         super().__init__(config=config, *inputs, **kwargs)
@@ -401,7 +405,8 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                                                          eos_token_id=kwargs['eos_token_id'],
                                                          pad_token_id=kwargs['pad_token_id'],
                                                          config=kwargs['encoder_decoder_config'],
-                                                         embedding_tokens_len=kwargs['embedding_tokens_len'])
+                                                         embedding_tokens_len=kwargs['embedding_tokens_len'],
+                                                         kwn_embedding_tokens_len=kwargs['kwn_embedding_tokens_len'])
 
         self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",
                                                                                      num_labels=kwargs['num_labels'])
