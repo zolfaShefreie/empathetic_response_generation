@@ -336,7 +336,7 @@ class KnowledgeFormatter:
         :param results:
         :return: text version of these data
         """
-        return ".\n".join([cls._convert_nodes_with_rel(nodes=rel_nodes,
+        return ".\n".join([cls._convert_nodes_with_rel(nodes=nodes,
                                                        rel=rel_name,
                                                        root_node=text)
                            for text, rel_nodes in results.items()
@@ -353,7 +353,7 @@ class KnowledgeFormatter:
 
         # apply other reformatting
         other_map_func = {rel_key_name: self._formatting_event_entity_rel_results
-                          for rel_key_name in [self.event_rel_key_name, self.event_rel_key_name]
+                          for rel_key_name in [self.event_rel_key_name, self.entity_rel_key_name]
                           if rel_key_name in sample.keys()}
 
         return {k: v if k not in other_map_func.keys() else other_map_func[k](v) for k, v in sample.items()}
@@ -433,8 +433,8 @@ class ToLong:
 
     def __call__(self, sample):
         if isinstance(sample, dict):
-            return {k: v.type(torch.long) for k, v in sample.items()}
-        return tuple(each.type(torch.long) for each in sample)
+            return {k: torch.Tensor(v).type(torch.long) for k, v in sample.items()}
+        return tuple(torch.Tensor(each).type(torch.long) for each in sample)
 
 
 class ConversationTokenizer:

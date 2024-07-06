@@ -143,7 +143,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
             item_data.update({
                 self.SOCIAL_REL_KEY_NAME: raw_item_data[self.SOCIAL_REL_KEY_NAME],
                 self.EVENT_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME],
-                self.ENTITY_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME]
+                self.ENTITY_REL_KEY_NAME: raw_item_data[self.ENTITY_REL_KEY_NAME]
             })
         if self.transform:
             return self.transform(item_data)

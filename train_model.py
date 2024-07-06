@@ -129,7 +129,8 @@ class TrainInterface(BaseInterface):
                                              react_key_name='react-rel',
                                              social_rel_key_name='social_rel',
                                              event_rel_key_name='event_rel',
-                                             entity_rel_key_name='entity_rel')
+                                             entity_rel_key_name='entity_rel',
+                                             max_len=200)
 
     TRANSFORMS = Pipeline(functions=[
         TextCleaner(texts_key_name='history'),
@@ -145,7 +146,7 @@ class TrainInterface(BaseInterface):
         KNOWLEDGE_TOKENIZER,
         ToTensor(),
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
-                     [f"{rel_name}_suffix" for rel_name in ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
+                     [f"{rel_name}_{suffix}" for rel_name in ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
                       for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         PreProcessEncoderDecoderInputDictVersion(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
                                                  gen_label_key_name='labels'),
