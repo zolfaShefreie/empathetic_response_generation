@@ -171,8 +171,8 @@ class Pipeline:
 class TextCleaner:
     PUNC = '''!()-[]{.};:'"\,<>/?@#$%^&*_~`|’“”…—–'''
 
-    def __init__(self, have_label=True):
-        self.have_label = have_label
+    def __init__(self, texts_key_name: str = 'history'):
+        self.texts_key_name = texts_key_name
 
     @classmethod
     def _clean_single_text(cls, text: str) -> str:
@@ -203,21 +203,14 @@ class TextCleaner:
         :return:
         """
         # texts = sample[0][0] if self.have_label else sample[0]
-        texts = sample[0]
+        texts = sample[self.texts_key_name]
 
         # value of each (row, col) can be list type or str type
         cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
             else self._clean_single_text(texts)
 
-        if self.have_label:
-            labels = tuple([np.array(each)
-                            if isinstance(each, list) or isinstance(each, int) or isinstance(each, np.ndarray)
-                            else np.array([each]) for each in sample[1:]])
-            return (np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray)
-                    else np.array([cleaned_result]), ) + labels
-        else:
-            return np.array(cleaned_result) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
-                else np.array([cleaned_result])
+        sample[self.texts_key_name] = cleaned_result
+        return sample
 
 
 class ConversationFormatter:

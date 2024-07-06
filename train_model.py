@@ -132,7 +132,7 @@ class TrainInterface(BaseInterface):
                                              entity_rel_key_name='entity_rel')
 
     TRANSFORMS = Pipeline(functions=[
-        TextCleaner(have_label=True),
+        TextCleaner(texts_key_name='history'),
         ConversationFormatter(history_key_name='history',
                               gen_label_key_name='label',
                               last_utter_key_name='last_utter'),
