@@ -114,9 +114,9 @@ class TrainInterface(BaseInterface):
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
                                                    max_len=300,
                                                    new_special_tokens={
-                                                      'additional_special_tokens': [
-                                                          ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
-                                                      'pad_token': '[PAD]'},
+                                                       'additional_special_tokens': [
+                                                           ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
+                                                       'pad_token': '[PAD]'},
                                                    last_utter_key_name='last_utter',
                                                    history_key_name='history',
                                                    gen_label_key_name='label',
@@ -144,10 +144,11 @@ class TrainInterface(BaseInterface):
         ToNumpy(),
         CONVERSATION_TOKENIZER,
         KNOWLEDGE_TOKENIZER,
-        ToTensor(),
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
-                     [f"{rel_name}_{suffix}" for rel_name in ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
-                      for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
+                                 [f"{rel_name}_{suffix}" for rel_name in
+                                  ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
+                                  for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
+        ToTensor(),
         PreProcessEncoderDecoderInputDictVersion(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
                                                  gen_label_key_name='labels'),
         ToLong(),
