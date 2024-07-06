@@ -40,8 +40,9 @@ class KnowledgeGenerator:
         cleaned_results = list()
         for gen_result in results:
             cleaned_gen_result = " ".join(gen_result.split())
-            if gen_result.lower() not in ['none', 'null', ]:
+            if cleaned_gen_result.lower() not in ['none', 'null', ]:
                 cleaned_results.append(cleaned_gen_result)
+        print(cleaned_results)
         return list(set(cleaned_results))
 
     @classmethod
