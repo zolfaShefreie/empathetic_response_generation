@@ -123,11 +123,11 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
 
 class KnowledgesEncoder(PreTrainedModel):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, config: PretrainedConfig = PretrainedConfig(), *args, **kwargs):
+        super().__init__(config=config ,*args, **kwargs)
         self.encoder = AlbertModel.from_pretrained("albert-base-v2")
-        self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=10, dropout=0.2)
-        self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=10, dropout=0.2)
+        self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
+        self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
 
     def forward(self,
                 react_rel_input_ids: Optional[torch.LongTensor] = None,
@@ -188,7 +188,7 @@ class KnowledgesEncoder(PreTrainedModel):
 
         return torch.mean(torch.stack([encoded_social_knw,
                                        social_event_attention_output,
-                                       social_entity_attention_output]), dim=-1) + encoded_react_knw
+                                       social_entity_attention_output]), dim=0) + encoded_react_knw
 
 
 class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
@@ -307,7 +307,7 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
             entity_rel_token_type_ids=entity_rel_token_type_ids
         )
 
-        knw_plus_encoder_hidden_state = torch.sum(torch.stack([encoder_hidden_states, encoded_knowledge]))
+        knw_plus_encoder_hidden_state = torch.sum(torch.stack([encoder_hidden_states, encoded_knowledge]), dim=0)
 
         # optionally project encoder_hidden_states
         if (

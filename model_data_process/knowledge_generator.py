@@ -9,7 +9,7 @@ nltk.download('popular')
 
 
 class KnowledgeGenerator:
-    COMET = Comet(model_path='smetan/comet-bart-aaai', device='gpu' if torch.cuda.is_available() else 'cpu')
+    COMET = Comet(model_path='smetan/comet-bart-aaai', device='cuda' if torch.cuda.is_available() else 'cpu')
     STOP_WORDS = set(stopwords.words('english'))
     SOCIAL_INTERACTION_REL = {'xIntent': 'because X wanted',
                               'xReact': 'as a result, X feels',
