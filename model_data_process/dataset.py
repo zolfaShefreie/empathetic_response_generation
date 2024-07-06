@@ -74,9 +74,10 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param add_knowledge: add knowledge to each conversation
         :return: dataset with new format
         """
-        if os.path.exists(f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"):
+        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}".replace("[", "_").replace(":", "_").replace("]", "_")
+        if os.path.exists(file_path):
             # load data from cache
-            with open(f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}", mode='r', encoding='utf-8') as file:
+            with open(file_path, mode='r', encoding='utf-8') as file:
                 content = file.read()
                 return ast.literal_eval(content)
 
@@ -98,7 +99,6 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                 data = cls._add_knowledge_to_conv(dataset=data)
 
             # save dataset on cache'_
-            file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}".replace("[", "_").replace(":", "_").replace("]", "_")
             if not os.path.exists(os.path.dirname(file_path)):
                 try:
                     os.makedirs(os.path.dirname(file_path))
@@ -125,7 +125,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                                cls.EVENT_REL_KEY_NAME: event,
                                cls.ENTITY_REL_KEY_NAME: entity}
             record_plus_knw.update(record)
-            knw_added_dataset.append(record)
+            knw_added_dataset.append(record_plus_knw)
 
         return knw_added_dataset
 
@@ -135,15 +135,15 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param idx: index
         :return:
         """
-        item_data = self.data[idx]
-        history, label, emotion_label = item_data['history'], item_data['label'], item_data['context']
+        raw_item_data = self.data[idx]
+        history, label, emotion_label = raw_item_data['history'], raw_item_data['label'], raw_item_data['context']
         emotion_label = self.EmotionType[emotion_label].value
         item_data = {'history': history, 'label': label, 'emotion_label': emotion_label}
-        if self.SOCIAL_REL_KEY_NAME in item_data.keys():
+        if self.SOCIAL_REL_KEY_NAME in raw_item_data.keys():
             item_data.update({
-                self.SOCIAL_REL_KEY_NAME: item_data[self.SOCIAL_REL_KEY_NAME],
-                self.EVENT_REL_KEY_NAME: item_data[self.EVENT_REL_KEY_NAME],
-                self.ENTITY_REL_KEY_NAME: item_data[self.EVENT_REL_KEY_NAME]
+                self.SOCIAL_REL_KEY_NAME: raw_item_data[self.SOCIAL_REL_KEY_NAME],
+                self.EVENT_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME],
+                self.ENTITY_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME]
             })
         if self.transform:
             return self.transform(item_data)
