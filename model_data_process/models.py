@@ -121,6 +121,69 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
 
+class ExampleEncoder(PreTrainedModel):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.encoder = AlbertModel.from_pretrained("albert-base-v2")
+
+    def forward(self,
+                example_0_input_ids: Optional[torch.LongTensor] = None,
+                example_0_attention_mask: Optional[torch.FloatTensor] = None,
+                example_0_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_1_input_ids: Optional[torch.LongTensor] = None,
+                example_1_attention_mask: Optional[torch.FloatTensor] = None,
+                example_1_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_2_input_ids: Optional[torch.LongTensor] = None,
+                example_2_attention_mask: Optional[torch.FloatTensor] = None,
+                example_2_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_3_input_ids: Optional[torch.LongTensor] = None,
+                example_3_attention_mask: Optional[torch.FloatTensor] = None,
+                example_3_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_4_input_ids: Optional[torch.LongTensor] = None,
+                example_4_attention_mask: Optional[torch.FloatTensor] = None,
+                example_4_token_type_ids: Optional[torch.FloatTensor] = None,
+                *args, **kwargs):
+        """
+
+        :param example_0_input_ids:
+        :param example_0_attention_mask:
+        :param example_0_token_type_ids:
+        :param example_1_input_ids:
+        :param example_1_attention_mask:
+        :param example_1_token_type_ids:
+        :param example_2_input_ids:
+        :param example_2_attention_mask:
+        :param example_2_token_type_ids:
+        :param example_3_input_ids:
+        :param example_3_attention_mask:
+        :param example_3_token_type_ids:
+        :param example_4_input_ids:
+        :param example_4_attention_mask:
+        :param example_4_token_type_ids:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        encoded_1 = self.encoder(input_ids=example_0_input_ids,
+                                 attention_mask=example_0_attention_mask,
+                                 token_type_ids=example_0_token_type_ids)[0]
+        encoded_2 = self.encoder(input_ids=example_1_input_ids,
+                                 attention_mask=example_1_attention_mask,
+                                 token_type_ids=example_1_token_type_ids)[0]
+        encoded_3 = self.encoder(input_ids=example_2_input_ids,
+                                 attention_mask=example_2_attention_mask,
+                                 token_type_ids=example_2_token_type_ids)[0]
+        encoded_4 = self.encoder(input_ids=example_3_input_ids,
+                                 attention_mask=example_3_attention_mask,
+                                 token_type_ids=example_3_token_type_ids)[0]
+        encoded_5 = self.encoder(input_ids=example_4_input_ids,
+                                 attention_mask=example_4_attention_mask,
+                                 token_type_ids=example_4_token_type_ids)[0]
+
+        return torch.sum(torch.stack([encoded_1, encoded_2, encoded_3, encoded_4, encoded_5]), dim=0)
+
+
 class KnowledgesEncoder(PreTrainedModel):
 
     def __init__(self, kwn_embedding_tokens_len=50266, config: PretrainedConfig = PretrainedConfig(), *args, **kwargs):
@@ -243,6 +306,7 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
         self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        self.example_encoders = ExampleEncoder()
 
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
@@ -270,6 +334,21 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
                 entity_rel_input_ids: Optional[torch.LongTensor] = None,
                 entity_rel_attention_mask: Optional[torch.FloatTensor] = None,
                 entity_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_0_input_ids: Optional[torch.LongTensor] = None,
+                example_0_attention_mask: Optional[torch.FloatTensor] = None,
+                example_0_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_1_input_ids: Optional[torch.LongTensor] = None,
+                example_1_attention_mask: Optional[torch.FloatTensor] = None,
+                example_1_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_2_input_ids: Optional[torch.LongTensor] = None,
+                example_2_attention_mask: Optional[torch.FloatTensor] = None,
+                example_2_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_3_input_ids: Optional[torch.LongTensor] = None,
+                example_3_attention_mask: Optional[torch.FloatTensor] = None,
+                example_3_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_4_input_ids: Optional[torch.LongTensor] = None,
+                example_4_attention_mask: Optional[torch.FloatTensor] = None,
+                example_4_token_type_ids: Optional[torch.FloatTensor] = None,
                 **kwargs) -> Union[Tuple, Seq2SeqLMOutput]:
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -306,12 +385,35 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
                 entity_rel_token_type_ids=entity_rel_token_type_ids
             )
 
+            encoded_examples = self.example_encoders(
+                example_0_input_ids=example_0_input_ids,
+                example_0_attention_mask=example_0_attention_mask,
+                example_0_token_type_ids=example_0_token_type_ids,
+                example_1_input_ids=example_1_input_ids,
+                example_1_attention_mask=example_1_attention_mask,
+                example_1_token_type_ids=example_1_token_type_ids,
+                example_2_input_ids=example_2_input_ids,
+                example_2_attention_mask=example_2_attention_mask,
+                example_2_token_type_ids=example_2_token_type_ids,
+                example_3_input_ids=example_3_input_ids,
+                example_3_attention_mask=example_3_attention_mask,
+                example_3_token_type_ids=example_3_token_type_ids,
+                example_4_input_ids=example_4_input_ids,
+                example_4_attention_mask=example_4_attention_mask,
+                example_4_token_type_ids=example_4_token_type_ids,
+            )
+
             # update encoder output
             if isinstance(encoder_outputs, tuple):
+                encoder_outputs = list(encoder_outputs)
                 encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_knowledge]), dim=0)
+                encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_examples]), dim=0)
+                encoder_outputs = tuple(encoder_outputs)
             else:
                 encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
                                                                               encoded_knowledge]), dim=0)
+                encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
+                                                                              encoded_examples]), dim=0)
         elif isinstance(encoder_outputs, tuple):
             encoder_outputs = BaseModelOutput(*encoder_outputs)
 
@@ -483,7 +585,22 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 'event_rel_token_type_ids': 'event_rel_token_type_ids',
                 'entity_rel_input_ids': 'entity_rel_input_ids',
                 'entity_rel_attention_mask': 'entity_rel_attention_mask',
-                'entity_rel_token_type_ids': 'entity_rel_token_type_ids'
+                'entity_rel_token_type_ids': 'entity_rel_token_type_ids',
+                'example_0_input_ids': 'example_0_input_ids',
+                'example_0_attention_mask': 'example_0_attention_mask',
+                'example_0_token_type_ids': 'example_0_token_type_ids',
+                'example_1_input_ids': 'example_1_input_ids',
+                'example_1_attention_mask': 'example_1_attention_mask',
+                'example_1_token_type_ids': 'example_1_token_type_ids',
+                'example_2_input_ids': 'example_2_input_ids',
+                'example_2_attention_mask': 'example_2_attention_mask',
+                'example_2_token_type_ids': 'example_2_token_type_ids',
+                'example_3_input_ids': 'example_3_input_ids',
+                'example_3_attention_mask': 'example_3_attention_mask',
+                'example_3_token_type_ids': 'example_3_token_type_ids',
+                'example_4_input_ids': 'example_4_input_ids',
+                'example_4_attention_mask': 'example_4_attention_mask',
+                'example_4_token_type_ids': 'example_4_token_type_ids'
             },
 
             'emotion_classifier': {
@@ -512,26 +629,46 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                 social_rel_attention_mask=None, social_rel_token_type_ids=None, event_rel_input_ids=None,
                 event_rel_attention_mask=None, event_rel_token_type_ids=None, entity_rel_input_ids=None,
                 entity_rel_attention_mask=None, entity_rel_token_type_ids=None,
+                example_0_input_ids=None, example_0_attention_mask=None, example_0_token_type_ids=None,
+                example_1_input_ids=None, example_1_attention_mask=None, example_1_token_type_ids=None,
+                example_2_input_ids=None, example_2_attention_mask=None, example_2_token_type_ids=None,
+                example_3_input_ids=None, example_3_attention_mask=None, example_3_token_type_ids=None,
+                example_4_input_ids=None, example_4_attention_mask=None, example_4_token_type_ids=None,
                 **kwargs) -> BaseMultiTaskOutput:
         """
-        rewrite this function to show its arguments and avoid empty batch Error for all arguments
-        :param entity_rel_token_type_ids:
-        :param entity_rel_attention_mask:
-        :param entity_rel_input_ids:
-        :param event_rel_token_type_ids:
-        :param event_rel_attention_mask:
-        :param event_rel_input_ids:
-        :param social_rel_token_type_ids:
-        :param social_rel_attention_mask:
-        :param social_rel_input_ids:
-        :param react_rel_token_type_ids:
-        :param react_rel_attention_mask:
-        :param react_rel_input_ids:
+
         :param input_ids:
         :param attention_mask:
         :param token_type_ids:
         :param emotion_labels:
         :param labels:
+        :param react_rel_input_ids:
+        :param react_rel_attention_mask:
+        :param react_rel_token_type_ids:
+        :param social_rel_input_ids:
+        :param social_rel_attention_mask:
+        :param social_rel_token_type_ids:
+        :param event_rel_input_ids:
+        :param event_rel_attention_mask:
+        :param event_rel_token_type_ids:
+        :param entity_rel_input_ids:
+        :param entity_rel_attention_mask:
+        :param entity_rel_token_type_ids:
+        :param example_0_input_ids:
+        :param example_0_attention_mask:
+        :param example_0_token_type_ids:
+        :param example_1_input_ids:
+        :param example_1_attention_mask:
+        :param example_1_token_type_ids:
+        :param example_2_input_ids:
+        :param example_2_attention_mask:
+        :param example_2_token_type_ids:
+        :param example_3_input_ids:
+        :param example_3_attention_mask:
+        :param example_3_token_type_ids:
+        :param example_4_input_ids:
+        :param example_4_attention_mask:
+        :param example_4_token_type_ids:
         :param kwargs:
         :return:
         """
@@ -547,4 +684,20 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                                event_rel_token_type_ids=event_rel_token_type_ids,
                                entity_rel_input_ids=entity_rel_input_ids,
                                entity_rel_attention_mask=entity_rel_attention_mask,
-                               entity_rel_token_type_ids=entity_rel_token_type_ids, **kwargs)
+                               entity_rel_token_type_ids=entity_rel_token_type_ids,
+                               example_0_input_ids=example_0_input_ids,
+                               example_0_attention_mask=example_0_attention_mask,
+                               example_0_token_type_ids=example_0_token_type_ids,
+                               example_1_input_ids=example_1_input_ids,
+                               example_1_attention_mask=example_1_attention_mask,
+                               example_1_token_type_ids=example_1_token_type_ids,
+                               example_2_input_ids=example_2_input_ids,
+                               example_2_attention_mask=example_2_attention_mask,
+                               example_2_token_type_ids=example_2_token_type_ids,
+                               example_3_input_ids=example_3_input_ids,
+                               example_3_attention_mask=example_3_attention_mask,
+                               example_3_token_type_ids=example_3_token_type_ids,
+                               example_4_input_ids=example_4_input_ids,
+                               example_4_attention_mask=example_4_attention_mask,
+                               example_4_token_type_ids=example_4_token_type_ids,
+                               **kwargs)
