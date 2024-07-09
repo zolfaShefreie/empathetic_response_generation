@@ -4,9 +4,11 @@ import torch
 import os
 import ast
 
+from model_data_process.example_retriever import ExampleRetriever
 from utils.preprocessing import NewVersionDialogues
 from settings import DATASET_CACHE_PATH
 from model_data_process.knowledge_generator import KnowledgeGenerator
+import pandas as pd
 
 
 class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
@@ -62,14 +64,15 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param split: train/test/validation
         :param transform:
         """
-        self.data = self._conv_preprocess(split=split)
+        self.data = self.conv_preprocess(split=split)
         self.transform = transform
         self.n_sample = len(self.data)
 
     @classmethod
-    def _conv_preprocess(cls, split: str, add_knowledge: bool = True) -> list:
+    def conv_preprocess(cls, split: str, add_knowledge: bool = True, add_examples: bool = True) -> list:
         """
         change the format of dataset
+        :param add_examples:
         :param split: train/test/validation
         :param add_knowledge: add knowledge to each conversation
         :return: dataset with new format
@@ -97,6 +100,9 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
 
             if add_knowledge:
                 data = cls._add_knowledge_to_conv(dataset=data)
+
+            if add_examples:
+                data = cls.add_examples(data=data, split=split)
 
             # save dataset on cache'_
             if not os.path.exists(os.path.dirname(file_path)):
@@ -128,6 +134,32 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
             knw_added_dataset.append(record_plus_knw)
 
         return knw_added_dataset
+
+    @classmethod
+    def add_examples(cls, data: list, split: str) -> list:
+        """
+        add examples to one record
+        :param data:
+        :param split:
+        :return:
+        """
+        new_dataset = list()
+        train_df = pd.DataFrame(data) if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train',
+                                                                                                          add_knowledge=True,
+                                                                                                          add_examples=False)
+        train_df['xReact'] = train_df['social_rel'].apply(lambda x: list(x.values())[0]['xReact'])
+        train_df['history_str'] = train_df['history'].apply(lambda x: ", ".join(x))
+
+        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
+                                             conv_key_name='original_conv_id')
+
+        for record in data:
+            record['history_str'] = ", ".join(record['history'])
+            record['xReact'] = list(record['social_rel'].values())[0]['xReact']
+            record = example_retriever(record)
+            new_dataset.append(record)
+
+        return new_dataset
 
     def __getitem__(self, idx: int):
         """

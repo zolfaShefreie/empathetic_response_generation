@@ -22,3 +22,6 @@ HUB_PRIVATE_REPO = {
 }
 
 HUB_ACCESS_TOKEN = env('HUB_ACCESS_TOKEN', default=None)
+
+
+DPR_ENCODER_PATH = None
