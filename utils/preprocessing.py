@@ -437,6 +437,39 @@ class KnowledgeTokenizer:
         return data
 
 
+class ExampleTokenizer:
+
+    def __init__(self, tokenizer, example_key_name: str = 'examples', number_of_examples: int = 5, max_len: int = 300):
+        self.tokenizer = tokenizer
+        self.example_key_name = example_key_name
+        self.number_of_examples = number_of_examples
+        self.MAX_LEN = max_len
+
+    def __call__(self, sample):
+        """
+        warning make sure to apply ToNumpy before using this function
+        :param sample:
+        :return:
+        """
+        data = dict()
+        for i in range(min(len(sample[self.example_key_name]), self.number_of_examples)):
+
+            inputs = self.tokenizer.encode_plus(sample[self.example_key_name][i],
+                                                add_special_tokens=True,
+                                                max_length=self.MAX_LEN,
+                                                padding='max_length',
+                                                return_attention_mask=True,
+                                                return_token_type_ids=True,
+                                                truncation=True)
+
+            data[f"example_{i}_input_ids"] = inputs['input_ids']
+            data[f"example_{i}_attention_mask"] = inputs['attention_mask']
+            data[f"example_{i}_token_type_ids"] = inputs['token_type_ids']
+
+        data.update(sample)
+        return data
+
+
 class ToTensor:
     """
     Convert ndarrays to Tensors

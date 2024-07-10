@@ -177,6 +177,10 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                 self.EVENT_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME],
                 self.ENTITY_REL_KEY_NAME: raw_item_data[self.ENTITY_REL_KEY_NAME]
             })
+        if ExampleRetriever.EXAMPLE_KEY_NAME in raw_item_data.keys():
+            item_data.update({
+                ExampleRetriever.EXAMPLE_KEY_NAME: raw_item_data[ExampleRetriever.EXAMPLE_KEY_NAME]
+            })
         if self.transform:
             return self.transform(item_data)
         return item_data

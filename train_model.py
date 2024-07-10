@@ -1,7 +1,8 @@
 from utils.interface import BaseInterface
 from model_data_process.dataset import EmpatheticDialoguesDataset
 from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTokenizer, TextCleaner, ToTensor, \
-    ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion
+    ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion, \
+    ExampleTokenizer
 from model_data_process import models
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_MODEL_ID
 from utils.callbacks import SaveHistoryCallback
@@ -133,6 +134,10 @@ class TrainInterface(BaseInterface):
                                              max_len=300,
                                              use_special_tokens=True)
 
+    EXAMPLE_TOKENIZER = ExampleTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
+                                         example_key_name='examples',
+                                         max_len=300)
+
     TRANSFORMS = Pipeline(functions=[
         TextCleaner(texts_key_name='history'),
         ConversationFormatter(history_key_name='history',
@@ -146,6 +151,7 @@ class TrainInterface(BaseInterface):
         ToNumpy(),
         CONVERSATION_TOKENIZER,
         KNOWLEDGE_TOKENIZER,
+        EXAMPLE_TOKENIZER,
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
                                  [f"{rel_name}_{suffix}" for rel_name in
                                   ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
