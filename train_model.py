@@ -155,6 +155,8 @@ class TrainInterface(BaseInterface):
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
                                  [f"{rel_name}_{suffix}" for rel_name in
                                   ['react_rel', 'social_rel', 'event_rel', 'entity_rel']
+                                  for suffix in ['input_ids', 'attention_mask', 'token_type_ids']] +
+                                 [f"example_{i}_{suffix}" for i in range(0, 5)
                                   for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ToTensor(),
         PreProcessEncoderDecoderInputDictVersion(tokenizer=CONVERSATION_TOKENIZER.tokenizer,
