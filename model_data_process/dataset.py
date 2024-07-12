@@ -3,12 +3,12 @@ from datasets import load_dataset
 import torch
 import os
 import ast
+import pandas as pd
 
 from model_data_process.example_retriever import ExampleRetriever
 from utils.preprocessing import NewVersionDialogues
 from settings import DATASET_CACHE_PATH
 from model_data_process.knowledge_generator import KnowledgeGenerator
-import pandas as pd
 
 
 class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
@@ -144,12 +144,12 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         new_dataset = list()
-        train_df = pd.DataFrame(data) if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train',
-                                                                                                          add_knowledge=True,
-                                                                                                          add_examples=False)
+        train_df = data if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train[:13]',
+                                                                                            add_knowledge=True,
+                                                                                            add_examples=False)
+        train_df = pd.DataFrame(train_df)
         train_df['xReact'] = train_df['social_rel'].apply(lambda x: list(x.values())[0]['xReact'])
         train_df['history_str'] = train_df['history'].apply(lambda x: ", ".join(x))
-
         example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
                                              conv_key_name='original_conv_id')
 

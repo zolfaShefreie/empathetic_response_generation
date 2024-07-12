@@ -91,8 +91,8 @@ class ExampleRetriever:
 
         for j in range(0, len(sentences), self.BATCH_SIZE):
             batch = tokenizer(sentences[j:j + self.BATCH_SIZE], padding=True, max_length=512, return_tensors="pt")
-            input_ids = batch["input_ids"].cuda() if torch.cusa.is_available() else batch["input_ids"]
-            attention_mask = batch["attention_mask"].cuda() if torch.cusa.is_available() else batch["attention_mask"]
+            input_ids = batch["input_ids"].cuda() if torch.cuda.is_available() else batch["input_ids"]
+            attention_mask = batch["attention_mask"].cuda() if torch.cuda.is_available() else batch["attention_mask"]
             with torch.no_grad():
                 output = model(input_ids, attention_mask)
             embeddings.append(output.pooler_output)
@@ -109,7 +109,7 @@ class ExampleRetriever:
         model = self.CTX_MODEL if is_ctx else self.QS_MODEL
         model.eval()
         tokenized_sentence = tokenizer(sentence, padding=True, max_length=512, return_tensors="pt")
-        if torch.cusa.is_available():
+        if torch.cuda.is_available():
             tokenized_sentence = {k: v.cuda() for k, v in tokenized_sentence.items()}
         with torch.no_grad():
             output = model(tokenized_sentence['input_ids'], tokenized_sentence['attention_mask']).pooler_output
