@@ -74,7 +74,7 @@ class ExampleRetriever:
             if len(matches) == 10:
                 break
 
-        record_examples.append([examples[ind] for ind in matches])
+        record_examples += [examples[ind] for ind in matches]
         query[self.EXAMPLE_KEY_NAME] = record_examples
         return query
 

@@ -123,8 +123,8 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
 
 class ExampleEncoder(PreTrainedModel):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, config=PretrainedConfig(), *args, **kwargs):
+        super().__init__(config=config, *args, **kwargs)
         self.encoder = AlbertModel.from_pretrained("albert-base-v2")
 
     def forward(self,
@@ -165,23 +165,42 @@ class ExampleEncoder(PreTrainedModel):
         :param kwargs:
         :return:
         """
-        encoded_1 = self.encoder(input_ids=example_0_input_ids,
-                                 attention_mask=example_0_attention_mask,
-                                 token_type_ids=example_0_token_type_ids)[0]
-        encoded_2 = self.encoder(input_ids=example_1_input_ids,
-                                 attention_mask=example_1_attention_mask,
-                                 token_type_ids=example_1_token_type_ids)[0]
-        encoded_3 = self.encoder(input_ids=example_2_input_ids,
-                                 attention_mask=example_2_attention_mask,
-                                 token_type_ids=example_2_token_type_ids)[0]
-        encoded_4 = self.encoder(input_ids=example_3_input_ids,
-                                 attention_mask=example_3_attention_mask,
-                                 token_type_ids=example_3_token_type_ids)[0]
-        encoded_5 = self.encoder(input_ids=example_4_input_ids,
-                                 attention_mask=example_4_attention_mask,
-                                 token_type_ids=example_4_token_type_ids)[0]
+        all_encoded = list()
 
-        return torch.sum(torch.stack([encoded_1, encoded_2, encoded_3, encoded_4, encoded_5]), dim=0)
+        if example_0_input_ids is not None:
+            encoded_1 = self.encoder(input_ids=example_0_input_ids,
+                                     attention_mask=example_0_attention_mask,
+                                     token_type_ids=example_0_token_type_ids)[0]
+            all_encoded.append(encoded_1)
+
+        if example_1_input_ids is not None:
+            encoded_2 = self.encoder(input_ids=example_1_input_ids,
+                                     attention_mask=example_1_attention_mask,
+                                     token_type_ids=example_1_token_type_ids)[0]
+            all_encoded.append(encoded_2)
+
+        if example_2_input_ids is not None:
+            encoded_3 = self.encoder(input_ids=example_2_input_ids,
+                                     attention_mask=example_2_attention_mask,
+                                     token_type_ids=example_2_token_type_ids)[0]
+            all_encoded.append(encoded_3)
+
+        if example_3_input_ids is not None:
+            encoded_4 = self.encoder(input_ids=example_3_input_ids,
+                                     attention_mask=example_3_attention_mask,
+                                     token_type_ids=example_3_token_type_ids)[0]
+            all_encoded.append(encoded_4)
+
+        if example_4_input_ids is not None:
+            encoded_5 = self.encoder(input_ids=example_4_input_ids,
+                                     attention_mask=example_4_attention_mask,
+                                     token_type_ids=example_4_token_type_ids)[0]
+            all_encoded.append(encoded_5)
+
+        if len(all_encoded) == 0:
+            return None
+
+        return torch.sum(torch.stack(all_encoded), dim=0)
 
 
 class KnowledgesEncoder(PreTrainedModel):
@@ -407,13 +426,15 @@ class KnowledgeRoberta2DialoGPT(EncoderDecoderModel, ABC):
             if isinstance(encoder_outputs, tuple):
                 encoder_outputs = list(encoder_outputs)
                 encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_knowledge]), dim=0)
-                encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_examples]), dim=0)
+                if encoded_examples is not None:
+                    encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_examples]), dim=0)
                 encoder_outputs = tuple(encoder_outputs)
             else:
                 encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
                                                                               encoded_knowledge]), dim=0)
-                encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
-                                                                              encoded_examples]), dim=0)
+                if encoded_examples is not None:
+                    encoder_outputs['last_hidden_state'] = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
+                                                                                  encoded_examples]), dim=0)
         elif isinstance(encoder_outputs, tuple):
             encoder_outputs = BaseModelOutput(*encoder_outputs)
 
