@@ -16,7 +16,7 @@ class ExampleRetriever:
     EXAMPLE_KEY_NAME = 'examples'
 
     def __init__(self, train_df: pd.DataFrame, ctx_key_name, qs_key_name, conv_key_name):
-        
+
         self.ctx_key_name = ctx_key_name
         self.qs_key_name = qs_key_name
         self.conv_key_name = conv_key_name
@@ -35,7 +35,7 @@ class ExampleRetriever:
         self.train_ctx = self.embeddings_for_batch_sentence(sentences=list(train_df[self.ctx_key_name]), is_ctx=True)
 
         # faiss initials
-        dim = self.train_ctx.shape[0]
+        dim = self.train_ctx.shape[1]
         self.index_flat = faiss.IndexFlatIP(dim)
         try:
             faiss.StandardGpuResources()
@@ -57,16 +57,15 @@ class ExampleRetriever:
         :param query_embedding:
         :return:
         """
-        k = 2047
+        k = 25
 
-        D, I = self.index_flat.search(np.expand_dim(query_embedding, 0), k) if not torch.cuda.is_available() \
-            else self.gpu_index_flat.search(query_embedding, k)
+        D, I = self.index_flat.search(x=query_embedding, k=k) if not self.CAN_USE_GPU_VERSION \
+            else self.gpu_index_flat.search(x=query_embedding, k=k)
 
         examples = list(self.train_df[self.ctx_key_name])
         record_examples = []
-
         emotions, conv_id = query["xReact"], query[self.conv_key_name]
-        candidate_indices = set(self.train_df[self.train_df.apply(lambda x: len(set(x['xReact']).intersection(set(emotions))) != 0 and x[self.conv_key_name] != conv_id)].index)
+        candidate_indices = set(self.train_df[self.train_df.apply(lambda x: len(set(x['xReact']).intersection(set(emotions))) != 0 and x[self.conv_key_name] != conv_id, axis=1)].index)
 
         retrieved, matches = np.array(I[0]), []
         for item in retrieved:
@@ -92,12 +91,12 @@ class ExampleRetriever:
 
         for j in range(0, len(sentences), self.BATCH_SIZE):
             batch = tokenizer(sentences[j:j + self.BATCH_SIZE], padding=True, max_length=512, return_tensors="pt")
-            input_ids = batch["input_ids"].cuda()
-            attention_mask = batch["attention_mask"].cuda()
+            input_ids = batch["input_ids"].cuda() if torch.cusa.is_available() else batch["input_ids"]
+            attention_mask = batch["attention_mask"].cuda() if torch.cusa.is_available() else batch["attention_mask"]
             with torch.no_grad():
                 output = model(input_ids, attention_mask)
             embeddings.append(output.pooler_output)
-        return np.array(torch.cat(embeddings))
+        return np.array(torch.cat(embeddings)) if not torch.cuda.is_available() else np.array(torch.cat(embeddings).cpu())
 
     def embeddings_for_one_sentence(self, sentence: str, is_ctx: bool = True) -> np.array:
         """
@@ -110,7 +109,11 @@ class ExampleRetriever:
         model = self.CTX_MODEL if is_ctx else self.QS_MODEL
         model.eval()
         tokenized_sentence = tokenizer(sentence, padding=True, max_length=512, return_tensors="pt")
-        return np.array(model(tokenized_sentence['input_ids'], tokenized_sentence['attention_mask']).pooler_output)
+        if torch.cusa.is_available():
+            tokenized_sentence = {k: v.cuda() for k, v in tokenized_sentence.items()}
+        with torch.no_grad():
+            output = model(tokenized_sentence['input_ids'], tokenized_sentence['attention_mask']).pooler_output
+            return np.array(output) if not torch.cuda.is_available() else np.array(output.cpu())
 
     def load_fine_tuned_dpr(self):
         """
