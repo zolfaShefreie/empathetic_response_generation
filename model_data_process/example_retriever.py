@@ -57,7 +57,7 @@ class ExampleRetriever:
         :param query_embedding:
         :return:
         """
-        k = 25
+        k = 2047
 
         D, I = self.index_flat.search(x=query_embedding, k=k) if not self.CAN_USE_GPU_VERSION \
             else self.gpu_index_flat.search(x=query_embedding, k=k)
