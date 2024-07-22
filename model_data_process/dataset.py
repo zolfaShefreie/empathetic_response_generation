@@ -9,6 +9,7 @@ from model_data_process.example_retriever import ExampleRetriever
 from utils.preprocessing import NewVersionDialogues
 from settings import DATASET_CACHE_PATH
 from model_data_process.knowledge_generator import KnowledgeGenerator
+from utils.audio_util import AudioModule
 
 
 class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
@@ -96,7 +97,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                                                   responses_in_history=True,
                                                   context_key_name='history',
                                                   label_key_name='label')
-            data = process_manager.reformat(raw_dataset=raw_dataset)
+            data = process_manager.two_party_reformat(raw_dataset=raw_dataset)
 
             if add_knowledge:
                 data = cls._add_knowledge_to_conv(dataset=data)
@@ -191,3 +192,133 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         return self.n_sample
+
+
+class MELDDataset(torch.utils.data.Dataset):
+    """
+        This class is written based on data on below link
+        (https://web.eecs.umich.edu/~mihalcea/downloads/MELD.Raw.tar.gz)
+    """
+    # todo: convert video to audio
+    # todo: get audio data
+
+    SPLIT_PATHS = {'train': {'metadata': 'train_sent_emo.csv',
+                             'folder': 'train/train_splits'},
+                   'validation': {'metadata': 'dev_sent_emo_dya.csv',
+                                  'folder': 'dev/dev_splits_complete'},
+                   'test': {'metadata': 'test_sent_emo.csv',
+                            'folder': 'test/output_repeated_splits_test'}}
+
+    FILE_PATH_KEY_NAME = 'file_path'
+    AUDIO_DATA_KEY_NAME = 'audio'
+    CACHE_PATH = DATASET_CACHE_PATH
+    DATASET_NAME = "meld"
+
+    def __init__(self, dataset_path: str, split='train', transform=None):
+        """
+        initial of dataset
+        :param dataset_path: path of unzipped dataset
+        :param split: train/test/validation
+        :param transform:
+        """
+        df = pd.read_csv(f"{dataset_path}/{self.SPLIT_PATHS[split]['metadata']}")
+        df = self._add_file_path_col(df=df, dataset_path=dataset_path, split=split)
+        self.data = df.to_dict('records')
+        self.transform = transform
+        self.n_sample = len(self.data)
+
+    @classmethod
+    def conv_preprocess(cls, split: str, dataset_path: str) -> list:
+        """
+        change the format of dataset
+        :param dataset_path:
+        :param split: train/test/validation
+        :return: dataset with new format
+        """
+        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"
+        if os.path.exists(file_path):
+            # load data from cache
+            with open(file_path, mode='r', encoding='utf-8') as file:
+                content = file.read()
+                return ast.literal_eval(content)
+
+        else:
+            # reformat meld dataset
+            raw_dataset = pd.read_csv(f"{dataset_path}/{cls.SPLIT_PATHS[split]['metadata']}")
+            raw_dataset = cls._add_file_path_col(df=raw_dataset, dataset_path=dataset_path, split=split)
+            raw_dataset = raw_dataset.to_dict('records')
+            process_manager = NewVersionDialogues(conv_id_key_name='Dialogue_ID',
+                                                  turn_key_name='Utterance_ID',
+                                                  utter_key_name='Utterance',
+                                                  other_conv_features=['Season', 'Episode', ],
+                                                  other_utter_features=['Sentiment', 'Emotion', 'Speaker',
+                                                                        'StartTime', 'EndTime', cls.FILE_PATH_KEY_NAME],
+                                                  new_conv_each_sys_responses=True,
+                                                  responses_in_history=True,
+                                                  context_key_name='history',
+                                                  label_key_name='label')
+            data = process_manager.multi_party_reformat(raw_dataset=raw_dataset)
+
+            # audio preprocessing
+            data = cls._audio_preprocessing(data=data)
+
+            # save dataset on cache'_
+            if not os.path.exists(os.path.dirname(file_path)):
+                try:
+                    os.makedirs(os.path.dirname(file_path))
+                except OSError as exc:
+                    print(exc)
+                    pass
+            with open(file_path, mode='w', encoding='utf-8') as file:
+                file.write(str(data))
+
+            return data
+
+    @classmethod
+    def _add_file_path_col(cls, df: pd.DataFrame, dataset_path, split='train') -> pd.DataFrame:
+        """
+        add a col for file
+        :param split:
+        :return:
+        """
+
+        def get_path(row):
+            """
+            get path of video file of meld dataset
+            :param row:
+            :return:
+            """
+            return f"{dataset_path}/{cls.SPLIT_PATHS[split]['folder']}/" \
+                   f"dia{row['Dialogue_ID']}_utt{row['Utterance_ID']}.mp4"
+
+        df[cls.FILE_PATH_KEY_NAME] = df.apply(get_path, axis=1)
+        return df
+
+    @classmethod
+    def _audio_preprocessing(cls, data: list) -> list:
+        """
+        extract audio and get data of it
+        :param data:
+        :return:
+        """
+        processed_data = list()
+
+        for record in data:
+            file_path = record[f"{cls.FILE_PATH_KEY_NAME}_label"]
+            audio_file_path = AudioModule.extract_audio_from_video(video_path=file_path,
+                                                                   saved_path=file_path.replace(".mp4", ".wav"))
+            record[f"{cls.FILE_PATH_KEY_NAME}_label"] = audio_file_path
+            record[cls.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=audio_file_path)
+            processed_data.append(record)
+
+        return processed_data
+
+    def __getitem__(self, index: int) -> dict:
+        item_data = self.data[index]
+        if self.transform:
+            return self.transform(item_data)
+        return item_data
+
+    def __len__(self):
+        return self.n_sample
+

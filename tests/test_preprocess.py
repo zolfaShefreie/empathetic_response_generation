@@ -58,14 +58,14 @@ class TestPreprocessReformat:
     def test_can_make_dialogues(self, raw_dataset, config_reformat_class_all_history_no_new_conv):
         process_manager = preprocessing.NewVersionDialogues(**config_reformat_class_all_history_no_new_conv)
 
-        new_version_dataset = process_manager.reformat(raw_dataset=raw_dataset)
+        new_version_dataset = process_manager.two_party_reformat(raw_dataset=raw_dataset)
         assert len(new_version_dataset) == 2
         assert new_version_dataset[0]['label'] == 'Oh was this something that happened because of an argument?'
 
     def test_can_include_history_correct(self, raw_dataset, config_reformat_class_res_history_all_new_conv):
         process_manager = preprocessing.NewVersionDialogues(**config_reformat_class_res_history_all_new_conv)
 
-        new_version_dataset = process_manager.reformat(raw_dataset=raw_dataset)
+        new_version_dataset = process_manager.two_party_reformat(raw_dataset=raw_dataset)
         assert len(new_version_dataset[2]['history']) == 3
         assert len(new_version_dataset[1]['history']) == 2
         assert len(new_version_dataset[0]['history']) == 1

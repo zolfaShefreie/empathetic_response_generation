@@ -7,8 +7,8 @@ class NewVersionDialogues:
     process that convert dataset to version of context (history) and response
 
     WARNING:
-        this class support list-dict format of two-party conversations
-        and dialogue must look like  (user_utter, system_utter)* sequences.
+        this class support list-dict format of conversations
+        and dialogue must look like  (user_utter, system_utter)* sequences for two_party dialogues
     """
     ORIGINAL_CONV_ID_KEY_NAME = 'original_conv_id'
 
@@ -93,7 +93,7 @@ class NewVersionDialogues:
             self.conv_id_key_name: conv_id
         }
 
-    def reformat(self, raw_dataset) -> list:
+    def two_party_reformat(self, raw_dataset) -> list:
         """
         :param raw_dataset:
         :return: a list of conversations
@@ -153,6 +153,38 @@ class NewVersionDialogues:
             conversations.append(self._merge_conv_record(record=previous_record,
                                                          current_conv=current_conversation,
                                                          is_label=True))
+
+        return conversations
+
+    def multi_party_reformat(self, raw_dataset) -> list:
+        """
+        each utterance is a response
+        :param raw_dataset:
+        :return: a list of conversations
+        """
+
+        conversations = list()
+        conv_id = 0
+        current_conversation = self._empty_conv_dict(conv_id=conv_id)
+        previous_record = dict()
+
+        for record in raw_dataset:
+
+            # if it is the record of new conversation
+            if current_conversation[self.ORIGINAL_CONV_ID_KEY_NAME] != record[self.conv_id_key_name]:
+                # reset current_conversation
+                conv_id += 1
+                current_conversation = self._empty_conv_dict(conv_id=conv_id)
+
+            # add a conversation with new response
+            conversations.append(self._merge_conv_record(record=previous_record,
+                                                         current_conv=current_conversation,
+                                                         is_label=True))
+
+            # merge record with new record for next record history
+            current_conversation = self._merge_conv_record(current_conv=current_conversation,
+                                                           record=record,
+                                                           is_label=False)
 
         return conversations
 
