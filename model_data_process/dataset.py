@@ -200,6 +200,20 @@ class MELDDataset(torch.utils.data.Dataset):
         (https://web.eecs.umich.edu/~mihalcea/downloads/MELD.Raw.tar.gz)
     """
 
+    class EmotionType(Enum):
+        surprise = 0
+        anger = 1
+        neutral = 2
+        joy = 3
+        sadness = 4
+        fear = 5
+        disgust = 6
+
+    class SentimentType(Enum):
+        positive = 0
+        negative = 1
+        neutral = 2
+
     SPLIT_PATHS = {'train': {'metadata': 'train_sent_emo.csv',
                              'folder': 'train/train_splits'},
                    'validation': {'metadata': 'dev_sent_emo_dya.csv',
@@ -312,11 +326,28 @@ class MELDDataset(torch.utils.data.Dataset):
         return processed_data
 
     def __getitem__(self, index: int) -> dict:
+        """
+        get item with specific index using dataset[index]
+        :param index:
+        :return:
+        """
         item_data = self.data[index]
+        emotion_label = self.EmotionType[item_data['Emotion_label']].value
+        sentiment_label = self.SentimentType[item_data['Sentiment_label']].valu
+        history = item_data['history'] + [item_data['label'], ]
+        item_data.update({
+            'history': history,
+            'labels': emotion_label,
+            'sentiment_label': sentiment_label
+        })
         if self.transform:
             return self.transform(item_data)
         return item_data
 
     def __len__(self):
+        """
+        length of dataset
+        :return:
+        """
         return self.n_sample
 
