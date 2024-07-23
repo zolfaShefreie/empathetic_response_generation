@@ -199,8 +199,6 @@ class MELDDataset(torch.utils.data.Dataset):
         This class is written based on data on below link
         (https://web.eecs.umich.edu/~mihalcea/downloads/MELD.Raw.tar.gz)
     """
-    # todo: convert video to audio
-    # todo: get audio data
 
     SPLIT_PATHS = {'train': {'metadata': 'train_sent_emo.csv',
                              'folder': 'train/train_splits'},

@@ -696,3 +696,28 @@ class PreProcessEncoderDecoderInputDictVersion:
             ]
 
         return sample
+
+
+class AudioFeatureExtractor:
+
+    def __init__(self, feature_extractor, audio_key_name='audio', result_key_name='audio_data'):
+        """
+        :param feature_extractor: like AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base")
+        :param audio_key_name:
+        :param result_key_name:
+        """
+        self.feature_extractor = feature_extractor
+        self.audio_key_name = audio_key_name
+        self.result_key_name = result_key_name
+
+    def __call__(self, sample: dict) -> dict:
+        """
+        apply feature extractor on audio
+        :param sample:
+        :return:
+        """
+        sample[self.result_key_name] = self.feature_extractor(
+            sample[self.audio_key_name]['array'], sampling_rate=self.feature_extractor.sampling_rate, max_length=16000,
+            truncation=True)
+
+        return sample
