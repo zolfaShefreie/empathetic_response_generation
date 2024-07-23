@@ -4,7 +4,7 @@ from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTok
     ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion, \
     ExampleTokenizer
 from model_data_process import models
-from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_MODEL_ID
+from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_TEXT_PRIVATE_REPO, HUB_ACCESS_TOKEN, HUB_TEXT_MODEL_ID
 from utils.callbacks import SaveHistoryCallback
 from utils.metrics import Metrics
 from utils.trainer import MultiTaskTrainer
@@ -199,9 +199,9 @@ class TrainInterface(BaseInterface):
 
             # hub configs
             push_to_hub=self.push_to_hub,
-            hub_model_id=HUB_MODEL_ID,
+            hub_model_id=HUB_TEXT_MODEL_ID,
             hub_strategy='checkpoint',
-            hub_private_repo=HUB_PRIVATE_REPO,
+            hub_private_repo=HUB_TEXT_PRIVATE_REPO,
             resume_from_checkpoint='last-checkpoint',
             hub_token=HUB_ACCESS_TOKEN,
             save_safetensors=False,
@@ -214,7 +214,7 @@ class TrainInterface(BaseInterface):
 
         model_class = models.EmotionRoberta2DialoGPT
         try:
-            model = model_class.from_pretrained(HUB_MODEL_ID, token=HUB_ACCESS_TOKEN)
+            model = model_class.from_pretrained(HUB_TEXT_MODEL_ID, token=HUB_ACCESS_TOKEN)
         except Exception as e:
             model = model_class(embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
                                 bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,

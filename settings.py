@@ -12,14 +12,13 @@ DATASET_CACHE_PATH = "./data/cache"
 DEFAULT_SAVE_DIR_PREFIX = "./models_checkpoint"
 
 # huggingface hub settings
-HUB_MODEL_ID = {
-    'roberta_shared': env('HUB_MODEL_ID_SHARED', default=None),
-    'roberta_gpt2': env('HUB_MODEL_ID_GPT', default=None)
-}
-HUB_PRIVATE_REPO = {
-    'roberta_shared': env('HUB_PRIVATE_REPO_SHARED', default=False),
-    'roberta_gpt2': env('HUB_PRIVATE_REPO_GPT', default=None)
-}
+# text generator using empatheticdialogues
+HUB_TEXT_MODEL_ID = env('HUB_TEXT_MODEL_ID', default=None),
+HUB_TEXT_PRIVATE_REPO = env('HUB_TEXT_PRIVATE_REPO', default=False)
+
+# multimodal emotion classifier using meld dataset
+HUB_CLASSIFIER_MODEL_ID = env('HUB_CLASSIFIER_MODEL_ID', default=None),
+HUB_CLASSIFIER_PRIVATE_REPO = env('HUB_CLASSIFIER_PRIVATE_REPO', default=False)
 
 HUB_ACCESS_TOKEN = env('HUB_ACCESS_TOKEN', default=None)
 
