@@ -791,18 +791,24 @@ class TextAudioIntegrator(PreTrainedModel):
 
 class MultiModelEmotionClassifier(PreTrainedModel):
 
-    def __init__(self, num_classes: int, config=PretrainedConfig(), *args, **kwargs):
+    def __init__(self, num_classes: int, embedding_tokens_len=50267, config=PretrainedConfig(), *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
+
         self.roberta = RobertaModel.from_pretrained('roberta-base')
+        self.roberta.resize_token_embeddings(embedding_tokens_len)
+
         self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
+
         self.text_audio_integrator = TextAudioIntegrator()
+        
         self.W = torch.nn.Linear(768, num_classes)
 
-    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True):
+    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True, labels=None,):
         """
         :param input_ids:
         :param attention_mask:
         :param audio_features:
+        :param labels:
         :param return_dict:
         :return:
         """
@@ -810,10 +816,12 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         audio_embed = self.data2vec_audio(audio_features).last_hidden_state[:, 0, :]
         embedding_output = self.text_audio_integrator(text_embedding=text_embed, acoustic_embedding=audio_embed)
         logits = self.W(embedding_output)
+        loss = None
 
-        # compute loss
-        loss_fct = CrossEntropyLoss()
-        loss = loss_fct(logits.view(-1, self.num_labels), logits.view(-1))
+        if labels is not None:
+            # compute loss
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         # prepare output
         if return_dict:
