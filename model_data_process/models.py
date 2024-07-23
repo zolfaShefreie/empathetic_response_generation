@@ -1,13 +1,14 @@
 from abc import ABC
 import torch.nn
-from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, EncoderDecoderModel, EncoderDecoderConfig,\
-    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification, AlbertModel
+from transformers import PretrainedConfig, AutoModel, AutoModelForCausalLM, EncoderDecoderModel, EncoderDecoderConfig, \
+    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification, AlbertModel, Data2VecAudioModel, RobertaModel
 import warnings
 import enum
 from typing import Optional, Tuple, Union
 from torch.nn import CrossEntropyLoss
-from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
+from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput, SequenceClassifierOutput
 from transformers.models.encoder_decoder.modeling_encoder_decoder import DEPRECATION_WARNING, shift_tokens_right
+import torch.nn.functional as F
 
 
 from utils.models import MultiTaskModel, BaseMultiTaskOutput
@@ -722,3 +723,105 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                                example_4_attention_mask=example_4_attention_mask,
                                example_4_token_type_ids=example_4_token_type_ids,
                                **kwargs)
+
+
+class TextAudioIntegrator(PreTrainedModel):
+    """
+    source https://github.com/yuntaeyang/TelME
+    """
+
+    def __init__(self, hidden_size=768, beta_shift=1e-1, dropout_prob=0.2, num_head=3,
+                 config=PretrainedConfig(), *args, **kwargs):
+        super().__init__(config=config, *args, **kwargs)
+
+        self.TEXT_DIM = 768
+        self.ACOUSTIC_DIM = 768
+        self.multihead_attn = torch.nn.MultiheadAttention(self.VISUAL_DIM + self.ACOUSTIC_DIM, num_head)
+
+        self.W_hav = torch.nn.Linear(self.VISUAL_DIM + self.ACOUSTIC_DIM + self.TEXT_DIM, self.TEXT_DIM)
+
+        self.W_av = torch.nn.Linear(self.VISUAL_DIM + self.ACOUSTIC_DIM, self.TEXT_DIM)
+
+        self.beta_shift = beta_shift
+
+        self.LayerNorm = torch.nn.LayerNorm(hidden_size)
+        self.AV_LayerNorm = torch.nn.LayerNorm(self.VISUAL_DIM + self.ACOUSTIC_DIM)
+        self.dropout = torch.nn.Dropout(dropout_prob)
+
+    def forward(self, text_embedding=None, acoustic_embedding=None):
+        """
+        integrate text embed with acoustic embed using Attention based modality Shifting Fusion
+        (idea of TelME: Teacher-leading Multimodal Fusion Network for Emotion Recognition in Conversation)
+        :param text_embedding:
+        :param acoustic_embedding:
+        :return:
+        """
+        eps = 1e-6
+
+        # apply self-attention on acoustic embeddings
+        new_nv = self.multihead_attn(acoustic_embedding, acoustic_embedding, acoustic_embedding)[0] + acoustic_embedding
+        att_audio_embedding = self.dropout(self.AV_LayerNorm(new_nv))
+
+        # shifting text embeddings
+        weight_av = F.relu(self.W_hav(torch.cat((att_audio_embedding, text_embedding), dim=-1)))
+
+        h_m = weight_av * self.W_av(att_audio_embedding)
+
+        em_norm = text_embedding.norm(2, dim=-1)
+        hm_norm = h_m.norm(2, dim=-1)
+
+        hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True).cuda()
+        hm_norm = torch.where(hm_norm == 0, hm_norm_ones, hm_norm)
+
+        thresh_hold = (em_norm / (hm_norm + eps)) * self.beta_shift
+
+        ones = torch.ones(thresh_hold.shape, requires_grad=True).cuda()
+
+        alpha = torch.min(thresh_hold, ones)
+        alpha = alpha.unsqueeze(dim=-1)
+
+        acoustic_vis_embedding = alpha * h_m
+
+        embedding_output = self.dropout(
+            self.LayerNorm(acoustic_vis_embedding + text_embedding)
+        )
+
+        return embedding_output
+
+
+class MultiModelEmotionClassifier(PreTrainedModel):
+
+    def __init__(self, num_classes: int, config=PretrainedConfig(), *args, **kwargs):
+        super().__init__(config=config, *args, **kwargs)
+        self.roberta = RobertaModel.from_pretrained('roberta-base')
+        self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
+        self.text_audio_integrator = TextAudioIntegrator()
+        self.W = torch.nn.Linear(768, num_classes)
+
+    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True):
+        """
+        :param input_ids:
+        :param attention_mask:
+        :param audio_features:
+        :param return_dict:
+        :return:
+        """
+        text_embed = self.roberta(input_ids=input_ids, attention_mask=attention_mask)[0]
+        audio_embed = self.data2vec_audio(audio_features).last_hidden_state[:, 0, :]
+        embedding_output = self.text_audio_integrator(text_embedding=text_embed, acoustic_embedding=audio_embed)
+        logits = self.W(embedding_output)
+
+        # compute loss
+        loss_fct = CrossEntropyLoss()
+        loss = loss_fct(logits.view(-1, self.num_labels), logits.view(-1))
+
+        # prepare output
+        if return_dict:
+            return SequenceClassifierOutput(
+                loss=loss,
+                logits=logits,
+                hidden_states=embedding_output,
+            )
+        else:
+            output = (logits,)
+            return ((loss,) + output) if loss is not None else output
