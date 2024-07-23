@@ -800,10 +800,11 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
 
         self.text_audio_integrator = TextAudioIntegrator()
-        
+
         self.W = torch.nn.Linear(768, num_classes)
 
-    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True, labels=None,):
+    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True, labels=None,
+                *args, **kwargs):
         """
         :param input_ids:
         :param attention_mask:
