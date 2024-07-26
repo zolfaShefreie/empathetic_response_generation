@@ -342,7 +342,6 @@ class TextualContextEncoder(PreTrainedModel):
             token_type_ids=token_type_ids,
             past_key_values=past_key_values,
             return_dict=True,
-            **kwargs,
         )
 
         encoded_knowledge = self.knowledge_encoder(
@@ -378,14 +377,6 @@ class TextualContextEncoder(PreTrainedModel):
             example_4_token_type_ids=example_4_token_type_ids,
         )
 
-        # update encoder output
-        # if isinstance(encoder_outputs, tuple):
-        #     encoder_outputs = list(encoder_outputs)
-        #     encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_knowledge]), dim=0)
-        #     if encoded_examples is not None:
-        #         encoder_outputs[0] = torch.sum(torch.stack([encoder_outputs[0], encoded_examples]), dim=0)
-        #     encoder_outputs = tuple(encoder_outputs)
-        # else:
         last_hidden_state = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
                                                    encoded_knowledge]), dim=0)
         if encoded_examples is not None:
@@ -423,7 +414,7 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         :param inputs:
         :param kwargs:
         """
-        # config_encoder = AutoConfig.from_pretrained('roberta-base')
+        config_encoder = AutoConfig.from_pretrained('roberta-base')
         config_decoder = AutoConfig.from_pretrained('microsoft/DialoGPT-small')
 
         config_decoder.is_decoder = True
@@ -431,12 +422,11 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         config_decoder.max_new_tokens = 64
         config_decoder.min_length = 2
 
-        encoder = TextualContextEncoder(embedding_tokens_len=embedding_tokens_len,
-                                        kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        encoder = AutoModel.from_config(config=config_encoder)
         decoder = AutoModelForCausalLM.from_config(config=config_decoder)
 
         if embedding_tokens_len:
-            # encoder.resize_token_embeddings(embedding_tokens_len)
+            encoder.resize_token_embeddings(embedding_tokens_len)
             decoder.resize_token_embeddings(embedding_tokens_len)
 
         if config is None:
@@ -455,10 +445,16 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         config.length_penalty = 2.0
         config.num_beams = 4
         config.vocab_size = config.encoder.vocab_size
+
+        encoder = TextualContextEncoder(embedding_tokens_len=embedding_tokens_len,
+                                        kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        config.encoder = encoder.config
+
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
-        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
-        self.example_encoders = ExampleEncoder()
+        # self.encoder = TextualContextEncoder(embedding_tokens_len=embedding_tokens_len,
+        #                                      kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        # self.config.encoder = self.encoder.config
 
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
