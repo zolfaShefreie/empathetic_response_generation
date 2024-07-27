@@ -912,18 +912,20 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
         self.W = torch.nn.Linear(768, num_classes)
 
-    def forward(self, input_ids=None, attention_mask=None, audio_features=None, return_dict=True, labels=None,
-                *args, **kwargs):
+    def forward(self, input_ids=None, attention_mask=None, audio_input_values=None, audio_attention_mask=None,
+                return_dict=True, labels=None, *args, **kwargs):
         """
         :param input_ids:
         :param attention_mask:
-        :param audio_features:
+        :param audio_input_values:
+        :param audio_attention_mask:
         :param labels:
         :param return_dict:
         :return:
         """
         text_embed = self.roberta(input_ids=input_ids, attention_mask=attention_mask)[0]
-        audio_embed = self.data2vec_audio(audio_features).last_hidden_state[:, 0, :]
+        audio_embed = self.data2vec_audio(input_values=audio_input_values, attention_mask=audio_attention_mask,
+                                          return_dict=True).last_hidden_state[:, 0, :]
         embedding_output = self.text_audio_integrator(text_embedding=text_embed, acoustic_embedding=audio_embed)
         logits = self.W(embedding_output)
         loss = None

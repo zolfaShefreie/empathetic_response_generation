@@ -277,10 +277,15 @@ class ConversationFormatter:
 
 class ToNumpy:
 
+    def __init__(self, unwanted_keys: list = None):
+        self.unwanted_keys = unwanted_keys if unwanted_keys is not None else list()
+
     def __call__(self, sample):
         if isinstance(sample, dict):
-            return {k: np.array(v) if isinstance(v, list) or isinstance(v, int) or isinstance(v, np.ndarray)
-                    else np.array([v]) for k, v in sample.items()}
+            result = {k: np.array(v) if isinstance(v, list) or isinstance(v, int) or isinstance(v, np.ndarray)
+                      else np.array([v]) for k, v in sample.items() if k not in self.unwanted_keys}
+            result.update({k: v for k, v in sample.items() if k in self.unwanted_keys})
+            return result
 
         return tuple([np.array(v) if isinstance(v, list) or isinstance(v, int) or isinstance(v, np.ndarray)
                       else np.array([v]) for v in sample])
@@ -508,6 +513,7 @@ class ToTensor:
     """
 
     def __call__(self, sample):
+        print(sample)
         if isinstance(sample, dict):
             return {k: torch.from_numpy(np.array(v)) for k, v in sample.items()}
         return tuple(torch.from_numpy(np.array(each)) for each in sample)
@@ -700,15 +706,15 @@ class PreProcessEncoderDecoderInputDictVersion:
 
 class AudioFeatureExtractor:
 
-    def __init__(self, feature_extractor, audio_key_name='audio', result_key_name='audio_data'):
+    def __init__(self, feature_extractor, audio_key_name='audio', result_prefix_key_name='audio'):
         """
         :param feature_extractor: like AutoFeatureExtractor.from_pretrained("facebook/wav2vec2-base")
         :param audio_key_name:
-        :param result_key_name:
+        :param result_prefix_key_name:
         """
         self.feature_extractor = feature_extractor
         self.audio_key_name = audio_key_name
-        self.result_key_name = result_key_name
+        self.result_prefix_key_name = result_prefix_key_name
 
     def __call__(self, sample: dict) -> dict:
         """
@@ -716,8 +722,9 @@ class AudioFeatureExtractor:
         :param sample:
         :return:
         """
-        sample[self.result_key_name] = self.feature_extractor(
-            sample[self.audio_key_name]['array'], sampling_rate=self.feature_extractor.sampling_rate, max_length=16000,
-            truncation=True)
-
+        result = self.feature_extractor(sample[self.audio_key_name]['array'],
+                                        sampling_rate=self.feature_extractor.sampling_rate,
+                                        max_length=16000,
+                                        truncation=True)
+        sample.update({f"{self.result_prefix_key_name}_{k}": v for k, v in result.items()})
         return sample
