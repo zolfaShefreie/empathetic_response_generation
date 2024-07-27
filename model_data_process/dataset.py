@@ -1,4 +1,6 @@
 from enum import Enum
+
+import numpy as np
 from datasets import load_dataset
 import torch
 import os
@@ -233,9 +235,8 @@ class MELDDataset(torch.utils.data.Dataset):
         :param split: train/test/validation
         :param transform:
         """
-        df = pd.read_csv(f"{dataset_path}/{self.SPLIT_PATHS[split]['metadata']}")
-        df = self._add_file_path_col(df=df, dataset_path=dataset_path, split=split)
-        self.data = df.to_dict('records')
+        self.data = self.conv_preprocess(split=split, dataset_path=dataset_path)
+        self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_path, split=split)
         self.transform = transform
         self.n_sample = len(self.data)
 
@@ -252,27 +253,24 @@ class MELDDataset(torch.utils.data.Dataset):
             # load data from cache
             with open(file_path, mode='r', encoding='utf-8') as file:
                 content = file.read()
-                return ast.literal_eval(content)
+                return ast.literal_eval(str(content))
 
         else:
             # reformat meld dataset
             raw_dataset = pd.read_csv(f"{dataset_path}/{cls.SPLIT_PATHS[split]['metadata']}")
-            raw_dataset = cls._add_file_path_col(df=raw_dataset, dataset_path=dataset_path, split=split)
             raw_dataset = raw_dataset.to_dict('records')
             process_manager = NewVersionDialogues(conv_id_key_name='Dialogue_ID',
                                                   turn_key_name='Utterance_ID',
                                                   utter_key_name='Utterance',
                                                   other_conv_features=['Season', 'Episode', ],
                                                   other_utter_features=['Sentiment', 'Emotion', 'Speaker',
-                                                                        'StartTime', 'EndTime', cls.FILE_PATH_KEY_NAME],
+                                                                        'Utterance_ID', 'StartTime', 'EndTime',
+                                                                        cls.FILE_PATH_KEY_NAME],
                                                   new_conv_each_sys_responses=True,
                                                   responses_in_history=True,
                                                   context_key_name='history',
                                                   label_key_name='label')
             data = process_manager.multi_party_reformat(raw_dataset=raw_dataset)
-
-            # audio preprocessing
-            data = cls._audio_preprocessing(data=data)
 
             # save dataset on cache'_
             if not os.path.exists(os.path.dirname(file_path)):
@@ -287,10 +285,10 @@ class MELDDataset(torch.utils.data.Dataset):
             return data
 
     @classmethod
-    def _add_file_path_col(cls, df: pd.DataFrame, dataset_path, split='train') -> pd.DataFrame:
+    def _audio_file_preprocessing(cls, data: list, dataset_path, split) -> list:
         """
-        add a col for file
-        :param split:
+        extract audio and get data of it
+        :param data:
         :return:
         """
 
@@ -301,27 +299,43 @@ class MELDDataset(torch.utils.data.Dataset):
             :return:
             """
             return f"{dataset_path}/{cls.SPLIT_PATHS[split]['folder']}/" \
-                   f"dia{row['Dialogue_ID']}_utt{row['Utterance_ID']}.mp4"
+                   f"dia{row['original_conv_id']}_utt{row['Utterance_ID_label']}.mp4"
 
-        df[cls.FILE_PATH_KEY_NAME] = df.apply(get_path, axis=1)
-        return df
+        processed_data = list()
 
-    @classmethod
-    def _audio_preprocessing(cls, data: list) -> list:
+        for record in data:
+            file_path = record[cls.FILE_PATH_KEY_NAME] = get_path(record)
+
+            # if there are some problems with file, the record won't get considered as a record of dataset
+            try:
+                if not os.path.exists(file_path.replace(".mp4", ".wav")):
+                    audio_file_path = AudioModule.extract_audio_from_video(video_path=file_path,
+                                                                           saved_path=file_path.replace(".mp4", ".wav"))
+                else:
+                    audio_file_path = file_path.replace(".mp4", ".wav")
+
+                record[f"{cls.FILE_PATH_KEY_NAME}_label"] = audio_file_path
+                record[cls.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=audio_file_path)
+                processed_data.append(record)
+
+            except Exception as e:
+                pass
+
+        return processed_data
+
+    def get_audio_data(self, data: list):
         """
-        extract audio and get data of it
+        get data of audio
         :param data:
         :return:
         """
         processed_data = list()
-
         for record in data:
-            file_path = record[f"{cls.FILE_PATH_KEY_NAME}_label"]
-            audio_file_path = AudioModule.extract_audio_from_video(video_path=file_path,
-                                                                   saved_path=file_path.replace(".mp4", ".wav"))
-            record[f"{cls.FILE_PATH_KEY_NAME}_label"] = audio_file_path
-            record[cls.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=audio_file_path)
-            processed_data.append(record)
+            try:
+                record[self.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=record[f"{self.FILE_PATH_KEY_NAME}_label"])
+                processed_data.append(data)
+            except Exception as e:
+                pass
 
         return processed_data
 
@@ -333,12 +347,12 @@ class MELDDataset(torch.utils.data.Dataset):
         """
         item_data = self.data[index]
         emotion_label = self.EmotionType[item_data['Emotion_label']].value
-        sentiment_label = self.SentimentType[item_data['Sentiment_label']].valu
+        sentiment_label = self.SentimentType[item_data['Sentiment_label']].value
         history = item_data['history'] + [item_data['label'], ]
         item_data.update({
             'history': history,
             'labels': emotion_label,
-            'sentiment_label': sentiment_label
+            'sentiment_label': sentiment_label,
         })
         if self.transform:
             return self.transform(item_data)

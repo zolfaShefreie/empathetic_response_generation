@@ -177,7 +177,7 @@ class NewVersionDialogues:
                 current_conversation = self._empty_conv_dict(conv_id=conv_id)
 
             # add a conversation with new response
-            conversations.append(self._merge_conv_record(record=previous_record,
+            conversations.append(self._merge_conv_record(record=record,
                                                          current_conv=current_conversation,
                                                          is_label=True))
 
