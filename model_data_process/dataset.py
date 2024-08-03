@@ -170,7 +170,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param idx: index
         :return:
         """
-        raw_item_data = self.data[idx]
+        raw_item_data = self.data[idx].copy()
         history, label, emotion_label = raw_item_data['history'], raw_item_data['label'], raw_item_data['context']
         emotion_label = self.EmotionType[emotion_label].value
         item_data = {'history': history, 'label': label, 'emotion_labels': emotion_label}
@@ -345,9 +345,10 @@ class MELDDataset(torch.utils.data.Dataset):
         :param index:
         :return:
         """
-        item_data = self.data[index]
+        item_data = self.data[index].copy()
         emotion_label = self.EmotionType[item_data['Emotion_label']].value
         sentiment_label = self.SentimentType[item_data['Sentiment_label']].value
+        # print(type(item_data['history']), item_data['history'], item_data['label'])
         history = item_data['history'] + [item_data['label'], ]
         item_data.update({
             'history': history,
