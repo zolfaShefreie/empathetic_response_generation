@@ -867,16 +867,21 @@ class TextAudioIntegrator(PreTrainedModel):
         """
         eps = 1e-6
 
+        # pooled input
+        text_embedding_mean_pool = torch.mean(text_embedding, dim=1, keepdim=True)
+        acoustic_embedding_mean_pool = torch.mean(acoustic_embedding, dim=1, keepdim=True)
+
         # apply self-attention on acoustic embeddings
-        new_nv = self.multihead_attn(acoustic_embedding, acoustic_embedding, acoustic_embedding)[0] + acoustic_embedding
+        new_nv = self.multihead_attn(acoustic_embedding_mean_pool, acoustic_embedding_mean_pool,
+                                     acoustic_embedding_mean_pool)[0] + acoustic_embedding_mean_pool
         att_audio_embedding = self.dropout(self.AV_LayerNorm(new_nv))
 
         # shifting text embeddings
-        weight_av = F.relu(self.W_hav(torch.cat((att_audio_embedding, text_embedding), dim=-1)))
+        weight_av = F.relu(self.W_hav(torch.cat((att_audio_embedding, text_embedding_mean_pool), dim=-1)))
 
         h_m = weight_av * self.W_av(att_audio_embedding)
 
-        em_norm = text_embedding.norm(2, dim=-1)
+        em_norm = text_embedding_mean_pool.norm(2, dim=-1)
         hm_norm = h_m.norm(2, dim=-1)
 
         hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True)
@@ -892,7 +897,7 @@ class TextAudioIntegrator(PreTrainedModel):
         acoustic_vis_embedding = alpha * h_m
 
         embedding_output = self.dropout(
-            self.LayerNorm(acoustic_vis_embedding + text_embedding)
+            self.LayerNorm(acoustic_vis_embedding + text_embedding_mean_pool)
         )
 
         return embedding_output
@@ -924,9 +929,9 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         :return:
         """
         text_embed = self.roberta(input_ids=input_ids, attention_mask=attention_mask,
-                                  return_dict=True).last_hidden_state[:, -1, :]
+                                  return_dict=True).last_hidden_state
         audio_embed = self.data2vec_audio(input_values=audio_input_values, attention_mask=audio_attention_mask,
-                                          return_dict=True).last_hidden_state[:, 0, :]
+                                          return_dict=True).last_hidden_state
         embedding_output = self.text_audio_integrator(text_embedding=text_embed, acoustic_embedding=audio_embed)
         logits = self.W(embedding_output)
         loss = None
