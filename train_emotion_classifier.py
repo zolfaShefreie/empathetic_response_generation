@@ -137,7 +137,7 @@ class TrainInterface(BaseInterface):
         FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'audio_input_values',
                                   'audio_attention_mask', 'labels', ]),
         ToTensor(),
-        ToLong(),
+        ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'audio_attention_mask']),
     ])
 
     def validate_number_of_epochs(self, value):

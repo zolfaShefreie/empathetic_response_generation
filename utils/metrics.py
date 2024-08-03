@@ -133,10 +133,16 @@ class Metrics:
 
         result = dict()
 
-        for i, task_name in enumerate(self.task_list):
-            pred_task, labels_task = pred.predictions[i], pred.label_ids[i]
-            func_task = getattr(self, f"compute_{task_name}_metric", None)
+        if len(self.task_list) == 1:
+            func_task = getattr(self, f"compute_{self.task_list[0]}_metric", None)
             if func_task is not None:
-                result.update(func_task(pred=pred_task, labels=labels_task))
+                result.update(func_task(pred=pred.predictions, labels=pred.label_ids))
+
+        else:
+            for i, task_name in enumerate(self.task_list):
+                pred_task, labels_task = pred.predictions[i], pred.label_ids[i]
+                func_task = getattr(self, f"compute_{task_name}_metric", None)
+                if func_task is not None:
+                    result.update(func_task(pred=pred_task, labels=labels_task))
 
         return result

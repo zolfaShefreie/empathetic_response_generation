@@ -513,7 +513,6 @@ class ToTensor:
     """
 
     def __call__(self, sample):
-        print(sample)
         if isinstance(sample, dict):
             return {k: torch.from_numpy(np.array(v)) for k, v in sample.items()}
         return tuple(torch.from_numpy(np.array(each)) for each in sample)
@@ -521,9 +520,13 @@ class ToTensor:
 
 class ToLong:
 
+    def __init__(self, wanted_list: list = None):
+        self.wanted_list = wanted_list
+
     def __call__(self, sample):
         if isinstance(sample, dict):
-            return {k: torch.Tensor(v).type(torch.long) for k, v in sample.items()}
+            return {k: torch.Tensor(v).type(torch.long) if k in self.wanted_list else torch.Tensor(v)
+                    for k, v in sample.items()}
         return tuple(torch.Tensor(each).type(torch.long) for each in sample)
 
 
@@ -726,5 +729,6 @@ class AudioFeatureExtractor:
                                         sampling_rate=self.feature_extractor.sampling_rate,
                                         max_length=16000,
                                         truncation=True)
-        sample.update({f"{self.result_prefix_key_name}_{k}": v for k, v in result.items()})
+
+        sample.update({f"{self.result_prefix_key_name}_{k}": v[0] for k, v in result.items()})
         return sample

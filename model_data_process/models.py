@@ -845,16 +845,16 @@ class TextAudioIntegrator(PreTrainedModel):
 
         self.TEXT_DIM = 768
         self.ACOUSTIC_DIM = 768
-        self.multihead_attn = torch.nn.MultiheadAttention(self.VISUAL_DIM + self.ACOUSTIC_DIM, num_head)
+        self.multihead_attn = torch.nn.MultiheadAttention(self.ACOUSTIC_DIM, num_head)
 
-        self.W_hav = torch.nn.Linear(self.VISUAL_DIM + self.ACOUSTIC_DIM + self.TEXT_DIM, self.TEXT_DIM)
+        self.W_hav = torch.nn.Linear(self.ACOUSTIC_DIM + self.TEXT_DIM, self.TEXT_DIM)
 
-        self.W_av = torch.nn.Linear(self.VISUAL_DIM + self.ACOUSTIC_DIM, self.TEXT_DIM)
+        self.W_av = torch.nn.Linear(self.ACOUSTIC_DIM, self.TEXT_DIM)
 
         self.beta_shift = beta_shift
 
         self.LayerNorm = torch.nn.LayerNorm(hidden_size)
-        self.AV_LayerNorm = torch.nn.LayerNorm(self.VISUAL_DIM + self.ACOUSTIC_DIM)
+        self.AV_LayerNorm = torch.nn.LayerNorm(self.ACOUSTIC_DIM)
         self.dropout = torch.nn.Dropout(dropout_prob)
 
     def forward(self, text_embedding=None, acoustic_embedding=None):
@@ -879,12 +879,12 @@ class TextAudioIntegrator(PreTrainedModel):
         em_norm = text_embedding.norm(2, dim=-1)
         hm_norm = h_m.norm(2, dim=-1)
 
-        hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True).cuda()
+        hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True)
         hm_norm = torch.where(hm_norm == 0, hm_norm_ones, hm_norm)
 
         thresh_hold = (em_norm / (hm_norm + eps)) * self.beta_shift
 
-        ones = torch.ones(thresh_hold.shape, requires_grad=True).cuda()
+        ones = torch.ones(thresh_hold.shape, requires_grad=True)
 
         alpha = torch.min(thresh_hold, ones)
         alpha = alpha.unsqueeze(dim=-1)
@@ -902,7 +902,7 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
     def __init__(self, num_classes: int, embedding_tokens_len=50267, config=PretrainedConfig(), *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
-
+        self.num_classes = num_classes
         self.roberta = RobertaModel.from_pretrained('roberta-base')
         self.roberta.resize_token_embeddings(embedding_tokens_len)
 
@@ -923,7 +923,8 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         :param return_dict:
         :return:
         """
-        text_embed = self.roberta(input_ids=input_ids, attention_mask=attention_mask)[0]
+        text_embed = self.roberta(input_ids=input_ids, attention_mask=attention_mask,
+                                  return_dict=True).last_hidden_state[:, -1, :]
         audio_embed = self.data2vec_audio(input_values=audio_input_values, attention_mask=audio_attention_mask,
                                           return_dict=True).last_hidden_state[:, 0, :]
         embedding_output = self.text_audio_integrator(text_embedding=text_embed, acoustic_embedding=audio_embed)
@@ -933,14 +934,13 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         if labels is not None:
             # compute loss
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            loss = loss_fct(logits.view(-1, self.num_classes), labels.view(-1))
 
         # prepare output
         if return_dict:
             return SequenceClassifierOutput(
                 loss=loss,
                 logits=logits,
-                hidden_states=embedding_output,
             )
         else:
             output = (logits,)
