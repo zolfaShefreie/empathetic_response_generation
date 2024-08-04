@@ -832,3 +832,228 @@ class MultiModelEmotionClassifier(PreTrainedModel):
         else:
             output = (logits,)
             return ((loss,) + output) if loss is not None else output
+
+
+class MultiModalResponseGenerator(EncoderDecoderModel, ABC):
+
+    def __init__(self, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
+                 config: PretrainedConfig = None, embedding_tokens_len=50267,
+                 kwn_embedding_tokens_len=50266,
+                 *inputs, **kwargs):
+        """
+        set encoder and decoder for Roberta-DialoGPT seq2seq model
+        :param config:
+        :param inputs:
+        :param kwargs:
+        """
+        config_encoder = AutoConfig.from_pretrained('roberta-base')
+        config_decoder = AutoConfig.from_pretrained('microsoft/DialoGPT-small')
+
+        config_decoder.is_decoder = True
+        config_decoder.add_cross_attention = True
+        config_decoder.max_new_tokens = 64
+        config_decoder.min_length = 2
+
+        encoder = AutoModel.from_config(config=config_encoder)
+        decoder = AutoModelForCausalLM.from_config(config=config_decoder)
+
+        if embedding_tokens_len:
+            encoder.resize_token_embeddings(embedding_tokens_len)
+            decoder.resize_token_embeddings(embedding_tokens_len)
+
+        if config is None:
+            config = EncoderDecoderConfig.from_encoder_decoder_configs(encoder_config=encoder.config,
+                                                                       decoder_config=decoder.config)
+        config.decoder_start_token_id = bos_token_id
+        config.eos_token_id = eos_token_id
+        config.pad_token_id = pad_token_id
+
+        # sensible parameters for beam search
+        # set decoding params
+        config.max_new_tokens = 64
+        config.min_length = 2
+        config.early_stopping = True
+        config.no_repeat_ngram_size = 3
+        config.length_penalty = 2.0
+        config.num_beams = 4
+        config.vocab_size = config.encoder.vocab_size
+        super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
+
+        self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
+        self.text_audio_integrator = TextAudioIntegrator()
+
+        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        self.example_encoders = ExampleEncoder()
+        self.norm_layer = torch.nn.LayerNorm(768)
+
+    def forward(self,
+                audio_input_values=None,
+                audio_attention_mask=None,
+                input_ids: Optional[torch.LongTensor] = None,
+                attention_mask: Optional[torch.FloatTensor] = None,
+                decoder_input_ids: Optional[torch.LongTensor] = None,
+                decoder_attention_mask: Optional[torch.BoolTensor] = None,
+                encoder_outputs: Optional[Tuple[torch.FloatTensor]] = None,
+                past_key_values: Tuple[Tuple[torch.FloatTensor]] = None,
+                inputs_embeds: Optional[torch.FloatTensor] = None,
+                decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
+                labels: Optional[torch.LongTensor] = None,
+                use_cache: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None,
+                react_rel_input_ids: Optional[torch.LongTensor] = None,
+                react_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                react_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                social_rel_input_ids: Optional[torch.LongTensor] = None,
+                social_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                social_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                event_rel_input_ids: Optional[torch.LongTensor] = None,
+                event_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                event_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                entity_rel_input_ids: Optional[torch.LongTensor] = None,
+                entity_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                entity_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_0_input_ids: Optional[torch.LongTensor] = None,
+                example_0_attention_mask: Optional[torch.FloatTensor] = None,
+                example_0_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_1_input_ids: Optional[torch.LongTensor] = None,
+                example_1_attention_mask: Optional[torch.FloatTensor] = None,
+                example_1_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_2_input_ids: Optional[torch.LongTensor] = None,
+                example_2_attention_mask: Optional[torch.FloatTensor] = None,
+                example_2_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_3_input_ids: Optional[torch.LongTensor] = None,
+                example_3_attention_mask: Optional[torch.FloatTensor] = None,
+                example_3_token_type_ids: Optional[torch.FloatTensor] = None,
+                example_4_input_ids: Optional[torch.LongTensor] = None,
+                example_4_attention_mask: Optional[torch.FloatTensor] = None,
+                example_4_token_type_ids: Optional[torch.FloatTensor] = None,
+                **kwargs) -> Union[Tuple, Seq2SeqLMOutput]:
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        kwargs_encoder = {argument: value for argument, value in kwargs.items() if not argument.startswith("decoder_")}
+
+        kwargs_decoder = {
+            argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
+        }
+
+        if encoder_outputs is None:
+            encoder_outputs = self.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=True,
+            )
+
+            encoded_audio_output = self.data2vec_audio(
+                input_values=audio_input_values,
+                attention_mask=audio_attention_mask,
+                return_dict=True,
+            )
+
+            # integrate encoded with audio
+
+            integrated_output = self.text_audio_integrator(text_embedding=encoder_outputs.last_hidden_state,
+                                                           acoustic_embedding=encoded_audio_output.last_hidden_state)
+
+            encoded_knowledge = self.knowledge_encoder(
+                react_rel_input_ids=react_rel_input_ids,
+                react_rel_attention_mask=react_rel_attention_mask,
+                react_rel_token_type_ids=react_rel_token_type_ids,
+                social_rel_input_ids=social_rel_input_ids,
+                social_rel_attention_mask=social_rel_attention_mask,
+                social_rel_token_type_ids=social_rel_token_type_ids,
+                event_rel_input_ids=event_rel_input_ids,
+                event_rel_attention_mask=event_rel_attention_mask,
+                event_rel_token_type_ids=event_rel_token_type_ids,
+                entity_rel_input_ids=entity_rel_input_ids,
+                entity_rel_attention_mask=entity_rel_attention_mask,
+                entity_rel_token_type_ids=entity_rel_token_type_ids
+            )
+
+            encoded_examples = self.example_encoders(
+                example_0_input_ids=example_0_input_ids,
+                example_0_attention_mask=example_0_attention_mask,
+                example_0_token_type_ids=example_0_token_type_ids,
+                example_1_input_ids=example_1_input_ids,
+                example_1_attention_mask=example_1_attention_mask,
+                example_1_token_type_ids=example_1_token_type_ids,
+                example_2_input_ids=example_2_input_ids,
+                example_2_attention_mask=example_2_attention_mask,
+                example_2_token_type_ids=example_2_token_type_ids,
+                example_3_input_ids=example_3_input_ids,
+                example_3_attention_mask=example_3_attention_mask,
+                example_3_token_type_ids=example_3_token_type_ids,
+                example_4_input_ids=example_4_input_ids,
+                example_4_attention_mask=example_4_attention_mask,
+                example_4_token_type_ids=example_4_token_type_ids,
+            )
+
+            last_hidden_state = integrated_output + encoded_knowledge
+
+            if encoded_examples is not None:
+                last_hidden_state = last_hidden_state + encoded_examples
+
+            encoder_outputs['last_hidden_state'] = self.norm_layer(last_hidden_state)
+
+        elif isinstance(encoder_outputs, tuple):
+            encoder_outputs = BaseModelOutput(*encoder_outputs)
+
+        encoder_hidden_states = encoder_outputs[0]
+
+        # optionally project encoder_hidden_states
+        if (
+                self.encoder.config.hidden_size != self.decoder.config.hidden_size
+                and self.decoder.config.cross_attention_hidden_size is None
+        ):
+            encoder_hidden_states = self.enc_to_dec_proj(encoder_hidden_states)
+
+        if (labels is not None) and (decoder_input_ids is None and decoder_inputs_embeds is None):
+            decoder_input_ids = shift_tokens_right(
+                labels, self.config.pad_token_id, self.config.decoder_start_token_id
+            )
+
+        # Decode
+        decoder_outputs = self.decoder(
+            input_ids=decoder_input_ids,
+            attention_mask=decoder_attention_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=attention_mask,
+            inputs_embeds=decoder_inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
+            return_dict=return_dict,
+            **kwargs_decoder,
+        )
+
+        # Compute loss independent from decoder (as some shift the logits inside them)
+        loss = None
+        if labels is not None:
+            warnings.warn(DEPRECATION_WARNING, FutureWarning)
+            logits = decoder_outputs.logits if return_dict else decoder_outputs[0]
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.reshape(-1, self.decoder.config.vocab_size), labels.view(-1))
+
+        if not return_dict:
+            if loss is not None:
+                return (loss,) + decoder_outputs + encoder_outputs
+            else:
+                return decoder_outputs + encoder_outputs
+
+        return Seq2SeqLMOutput(
+            loss=loss,
+            logits=decoder_outputs.logits,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+            encoder_hidden_states=encoder_outputs.hidden_states,
+            encoder_attentions=encoder_outputs.attentions,
+        )
