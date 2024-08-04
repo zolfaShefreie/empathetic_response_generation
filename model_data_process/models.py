@@ -6,8 +6,7 @@ import warnings
 import enum
 from typing import Optional, Tuple, Union
 from torch.nn import CrossEntropyLoss
-from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput, SequenceClassifierOutput, \
-    BaseModelOutputWithPoolingAndCrossAttentions
+from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput, SequenceClassifierOutput
 from transformers.models.encoder_decoder.modeling_encoder_decoder import DEPRECATION_WARNING, shift_tokens_right
 import torch.nn.functional as F
 
@@ -277,132 +276,7 @@ class KnowledgesEncoder(PreTrainedModel):
                                        social_entity_attention_output]), dim=0) + encoded_react_knw
 
 
-class TextualContextEncoder(PreTrainedModel):
-
-    def __init__(self, config: PretrainedConfig = PretrainedConfig(), embedding_tokens_len=50267,
-                 kwn_embedding_tokens_len=50266,
-                 *inputs, **kwargs):
-
-        super().__init__(config=config, *inputs, **kwargs)
-
-        self.config.hidden_size = 768
-        self.config.is_decoder = False
-
-        self.roberta = RobertaModel.from_pretrained('roberta-base')
-        if embedding_tokens_len:
-            self.roberta.resize_token_embeddings(embedding_tokens_len)
-        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
-        self.example_encoders = ExampleEncoder()
-        self.norm_layer = torch.nn.LayerNorm(768)
-
-    def forward(self,
-                input_ids: Optional[torch.LongTensor] = None,
-                attention_mask: Optional[torch.FloatTensor] = None,
-                token_type_ids: Optional[torch.Tensor] = None,
-                past_key_values: Tuple[Tuple[torch.FloatTensor]] = None,
-                inputs_embeds: Optional[torch.FloatTensor] = None,
-                output_attentions: Optional[bool] = None,
-                output_hidden_states: Optional[bool] = None,
-                return_dict: Optional[bool] = None,
-                react_rel_input_ids: Optional[torch.LongTensor] = None,
-                react_rel_attention_mask: Optional[torch.FloatTensor] = None,
-                react_rel_token_type_ids: Optional[torch.FloatTensor] = None,
-                social_rel_input_ids: Optional[torch.LongTensor] = None,
-                social_rel_attention_mask: Optional[torch.FloatTensor] = None,
-                social_rel_token_type_ids: Optional[torch.FloatTensor] = None,
-                event_rel_input_ids: Optional[torch.LongTensor] = None,
-                event_rel_attention_mask: Optional[torch.FloatTensor] = None,
-                event_rel_token_type_ids: Optional[torch.FloatTensor] = None,
-                entity_rel_input_ids: Optional[torch.LongTensor] = None,
-                entity_rel_attention_mask: Optional[torch.FloatTensor] = None,
-                entity_rel_token_type_ids: Optional[torch.FloatTensor] = None,
-                example_0_input_ids: Optional[torch.LongTensor] = None,
-                example_0_attention_mask: Optional[torch.FloatTensor] = None,
-                example_0_token_type_ids: Optional[torch.FloatTensor] = None,
-                example_1_input_ids: Optional[torch.LongTensor] = None,
-                example_1_attention_mask: Optional[torch.FloatTensor] = None,
-                example_1_token_type_ids: Optional[torch.FloatTensor] = None,
-                example_2_input_ids: Optional[torch.LongTensor] = None,
-                example_2_attention_mask: Optional[torch.FloatTensor] = None,
-                example_2_token_type_ids: Optional[torch.FloatTensor] = None,
-                example_3_input_ids: Optional[torch.LongTensor] = None,
-                example_3_attention_mask: Optional[torch.FloatTensor] = None,
-                example_3_token_type_ids: Optional[torch.FloatTensor] = None,
-                example_4_input_ids: Optional[torch.LongTensor] = None,
-                example_4_attention_mask: Optional[torch.FloatTensor] = None,
-                example_4_token_type_ids: Optional[torch.FloatTensor] = None,
-                **kwargs):
-
-        encoder_outputs = self.roberta(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            token_type_ids=token_type_ids,
-            past_key_values=past_key_values,
-            return_dict=True,
-        )
-
-        encoded_knowledge = self.knowledge_encoder(
-            react_rel_input_ids=react_rel_input_ids,
-            react_rel_attention_mask=react_rel_attention_mask,
-            react_rel_token_type_ids=react_rel_token_type_ids,
-            social_rel_input_ids=social_rel_input_ids,
-            social_rel_attention_mask=social_rel_attention_mask,
-            social_rel_token_type_ids=social_rel_token_type_ids,
-            event_rel_input_ids=event_rel_input_ids,
-            event_rel_attention_mask=event_rel_attention_mask,
-            event_rel_token_type_ids=event_rel_token_type_ids,
-            entity_rel_input_ids=entity_rel_input_ids,
-            entity_rel_attention_mask=entity_rel_attention_mask,
-            entity_rel_token_type_ids=entity_rel_token_type_ids
-        )
-
-        encoded_examples = self.example_encoders(
-            example_0_input_ids=example_0_input_ids,
-            example_0_attention_mask=example_0_attention_mask,
-            example_0_token_type_ids=example_0_token_type_ids,
-            example_1_input_ids=example_1_input_ids,
-            example_1_attention_mask=example_1_attention_mask,
-            example_1_token_type_ids=example_1_token_type_ids,
-            example_2_input_ids=example_2_input_ids,
-            example_2_attention_mask=example_2_attention_mask,
-            example_2_token_type_ids=example_2_token_type_ids,
-            example_3_input_ids=example_3_input_ids,
-            example_3_attention_mask=example_3_attention_mask,
-            example_3_token_type_ids=example_3_token_type_ids,
-            example_4_input_ids=example_4_input_ids,
-            example_4_attention_mask=example_4_attention_mask,
-            example_4_token_type_ids=example_4_token_type_ids,
-        )
-
-        last_hidden_state = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
-                                                   encoded_knowledge]), dim=0)
-        if encoded_examples is not None:
-            last_hidden_state = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
-                                                       encoded_examples]), dim=0)
-
-        last_hidden_state = self.norm_layer(last_hidden_state)
-
-        if not return_dict:
-            return (last_hidden_state, encoder_outputs.pooler_output) + encoder_outputs[1:]
-
-        return BaseModelOutputWithPoolingAndCrossAttentions(
-            last_hidden_state=last_hidden_state,
-            pooler_output=encoder_outputs.pooler_output,
-            past_key_values=encoder_outputs.past_key_values,
-            hidden_states=encoder_outputs.hidden_states,
-            attentions=encoder_outputs.attentions,
-            cross_attentions=encoder_outputs.cross_attentions,
-        )
-
-
 class TextualResponseGenerator(EncoderDecoderModel, ABC):
-    """
-    it isn't necessary to make a new class,
-    this class is written to change lately on initial and forward functions
-    """
 
     def __init__(self, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  config: PretrainedConfig = None, embedding_tokens_len=50267,
@@ -445,16 +319,11 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         config.length_penalty = 2.0
         config.num_beams = 4
         config.vocab_size = config.encoder.vocab_size
-
-        encoder = TextualContextEncoder(embedding_tokens_len=embedding_tokens_len,
-                                        kwn_embedding_tokens_len=kwn_embedding_tokens_len)
-        config.encoder = encoder.config
-
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
-        # self.encoder = TextualContextEncoder(embedding_tokens_len=embedding_tokens_len,
-        #                                      kwn_embedding_tokens_len=kwn_embedding_tokens_len)
-        # self.config.encoder = self.encoder.config
+        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        self.example_encoders = ExampleEncoder()
+        self.kwn_exmp_norm_layer = torch.nn.LayerNorm(768)
 
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
@@ -514,7 +383,10 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
                 inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
+                return_dict=True,
+            )
+
+            encoded_knowledge = self.knowledge_encoder(
                 react_rel_input_ids=react_rel_input_ids,
                 react_rel_attention_mask=react_rel_attention_mask,
                 react_rel_token_type_ids=react_rel_token_type_ids,
@@ -526,7 +398,10 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
                 event_rel_token_type_ids=event_rel_token_type_ids,
                 entity_rel_input_ids=entity_rel_input_ids,
                 entity_rel_attention_mask=entity_rel_attention_mask,
-                entity_rel_token_type_ids=entity_rel_token_type_ids,
+                entity_rel_token_type_ids=entity_rel_token_type_ids
+            )
+
+            encoded_examples = self.example_encoders(
                 example_0_input_ids=example_0_input_ids,
                 example_0_attention_mask=example_0_attention_mask,
                 example_0_token_type_ids=example_0_token_type_ids,
@@ -542,8 +417,15 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
                 example_4_input_ids=example_4_input_ids,
                 example_4_attention_mask=example_4_attention_mask,
                 example_4_token_type_ids=example_4_token_type_ids,
-                **kwargs_encoder,
             )
+
+            last_hidden_state = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
+                                                       encoded_knowledge]), dim=0)
+            if encoded_examples is not None:
+                last_hidden_state = torch.sum(torch.stack([encoder_outputs.last_hidden_state,
+                                                           encoded_examples]), dim=0)
+
+            encoder_outputs['last_hidden_state'] = self.kwn_exmp_norm_layer(last_hidden_state)
 
         elif isinstance(encoder_outputs, tuple):
             encoder_outputs = BaseModelOutput(*encoder_outputs)
@@ -662,7 +544,7 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
         :return:
         """
         encoder = getattr(self.encoder_decoder, 'encoder')
-        setattr(self.emotion_classifier, 'roberta', encoder.roberta)
+        setattr(self.emotion_classifier, 'roberta', encoder)
 
     def get_arg_forward_settings(self) -> dict:
         """
