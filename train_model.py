@@ -115,10 +115,13 @@ class TrainInterface(BaseInterface):
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
                                                    source_max_len=300,
                                                    label_max_len=100,
+                                                   # new_special_tokens={
+                                                   #     'additional_special_tokens': [
+                                                   #         ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
+                                                   #     'pad_token': '[PAD]'},
                                                    new_special_tokens={
-                                                       'additional_special_tokens': [
-                                                           ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
-                                                       'pad_token': '[PAD]'},
+                                                       'pad_token': '[PAD]'
+                                                   },
                                                    last_utter_key_name='last_utter',
                                                    history_key_name='history',
                                                    gen_label_key_name='label',
@@ -144,7 +147,7 @@ class TrainInterface(BaseInterface):
         ConversationFormatter(history_key_name='history',
                               gen_label_key_name='label',
                               last_utter_key_name='last_utter',
-                              utter_sep=None),
+                              utter_sep=' '),
         KnowledgeFormatter(social_rel_key_name='social_rel',
                            event_rel_key_name='event_rel',
                            entity_rel_key_name='entity_rel',
@@ -224,11 +227,16 @@ class TrainInterface(BaseInterface):
             model = model_class.from_pretrained(HUB_TEXT_MODEL_ID, token=HUB_ACCESS_TOKEN)
         except Exception as e:
             model = model_class(embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
+                                special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                                    for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
                                 bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
                                 eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
                                 pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
                                 num_labels=32,
-                                kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer))
+                                kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
+                                div_loss_weight=1.5,
+                                main_loss_weight=1,
+                                empathy_loss_weight=0.1)
 
         trainer = MultiTaskTrainer(
             model=model,

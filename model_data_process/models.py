@@ -652,6 +652,10 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                  config: PretrainedConfig = PretrainedConfig(),
                  *inputs,
                  **kwargs):
+        kwargs['special_token_dict'] = kwargs.get('special_token_dict', None)
+        kwargs['empathy_loss_weight'] = kwargs.get('empathy_loss_weight', 0.1)
+        kwargs['main_loss_weight'] = kwargs.get('main_loss_weight', 1)
+        kwargs['div_loss_weight'] = kwargs.get('div_loss_weight', 1.5)
         kwargs['bos_token_id'] = kwargs.get('bos_token_id', 0)
         kwargs['eos_token_id'] = kwargs.get('eos_token_id', 2)
         kwargs['pad_token_id'] = kwargs.get('pad_token_id', 50266)
@@ -681,7 +685,11 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                                                         pad_token_id=kwargs['pad_token_id'],
                                                         config=kwargs['encoder_decoder_config'],
                                                         embedding_tokens_len=kwargs['embedding_tokens_len'],
-                                                        kwn_embedding_tokens_len=kwargs['kwn_embedding_tokens_len'])
+                                                        kwn_embedding_tokens_len=kwargs['kwn_embedding_tokens_len'],
+                                                        div_loss_weight=kwargs['div_loss_weight'],
+                                                        empathy_loss_weight=kwargs['empathy_loss_weight'],
+                                                        main_loss_weight=kwargs['main_loss_weight'],
+                                                        special_token_dict=kwargs['special_token_dict'])
 
         self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",
                                                                                      num_labels=kwargs['num_labels'])
@@ -996,9 +1004,9 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
 class MultiModalResponseGenerator(TextualResponseGenerator, ABC):
 
-    def __init__(self, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
+    def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  config: PretrainedConfig = None, embedding_tokens_len=50267,
-                 kwn_embedding_tokens_len=50266,
+                 kwn_embedding_tokens_len=50266, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
                  *inputs, **kwargs):
         """
         set encoder and decoder for Roberta-DialoGPT seq2seq model
@@ -1006,7 +1014,9 @@ class MultiModalResponseGenerator(TextualResponseGenerator, ABC):
         :param inputs:
         :param kwargs:
         """
-        super().__init__(config=config, bos_token_id=bos_token_id, eos_token_id=eos_token_id,
+        super().__init__(special_token_dict=special_token_dict, empathy_loss_weight=empathy_loss_weight,
+                         main_loss_weight=main_loss_weight, div_loss_weight=div_loss_weight, config=config,
+                         bos_token_id=bos_token_id, eos_token_id=eos_token_id,
                          pad_token_id=pad_token_id, embedding_tokens_len=embedding_tokens_len,
                          kwn_embedding_tokens_len=kwn_embedding_tokens_len, *inputs, **kwargs)
 
