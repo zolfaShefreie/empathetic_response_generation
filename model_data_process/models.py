@@ -504,6 +504,9 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         """
         compute loss
         :param labels:
+        :param context_input_ids:
+        :param context_attention_mask:
+        :param response_mask:
         :param decoder_outputs:
         :param return_dict:
         :return:
@@ -514,6 +517,9 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             logits = decoder_outputs.logits if return_dict else decoder_outputs[0]
             loss_fct = CrossEntropyLoss()
             main_loss = loss_fct(logits.reshape(-1, self.decoder.config.vocab_size), labels.view(-1))
+
+            if response_mask is None:
+                response_mask = torch.ones(labels.size())
 
             # compute empathy loss
             self.empathy_classifier_model1.eval()
