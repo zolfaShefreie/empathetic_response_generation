@@ -9,6 +9,7 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput, SequenceClassifierOutput
 from transformers.models.encoder_decoder.modeling_encoder_decoder import DEPRECATION_WARNING, shift_tokens_right
 import torch.nn.functional as F
+from collections import Counter
 
 from settings import EMPATHY_CLASSIFIER_MODELS_PATH
 from utils.models import MultiTaskModel, BaseMultiTaskOutput, T5EncoderClassifier
@@ -278,9 +279,9 @@ class KnowledgesEncoder(PreTrainedModel):
 
 class TextualResponseGenerator(EncoderDecoderModel, ABC):
 
-    def __init__(self, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
+    def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  config: PretrainedConfig = None, embedding_tokens_len=50267,
-                 kwn_embedding_tokens_len=50266, empathy_loss_weight=0.1, main_loss_weight=1,
+                 kwn_embedding_tokens_len=50266, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
                  *inputs, **kwargs):
         """
         set encoder and decoder for Roberta-DialoGPT seq2seq model
@@ -321,12 +322,18 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         config.vocab_size = config.encoder.vocab_size
         super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
 
-        self.empathy_loss_weight = empathy_loss_weight
-        self.main_loss_weight = main_loss_weight
-
         self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
         self.example_encoders = ExampleEncoder()
         self.norm_layer = torch.nn.LayerNorm(768)
+
+        # loss
+        self.empathy_loss_weight = empathy_loss_weight
+        self.main_loss_weight = main_loss_weight
+        self.div_loss_weight = div_loss_weight
+
+        self.special_token_dict = special_token_dict
+        self.word_freq = torch.zeros(self.config.vocab_size)
+        self.criterion = torch.nn.NLLLoss(ignore_index=config.pad_token_id, reduction="sum")
 
         # models for losses
         self.empathy_classifier_model1 = T5EncoderClassifier("base", 2, 0)
@@ -499,6 +506,83 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             encoder_attentions=encoder_outputs.attentions,
         )
 
+    def compute_face_loss(self, labels=None, logits=None):
+        """
+        the source of code is https://github.com/Sahandfer/CEM
+        :param labels:
+        :param logits:
+        :return:
+        """
+
+        def clean_preds(logit):
+            pred = torch.argmax(logit, dim=2)
+            return pred.tolist()
+
+        def update_frequency(preds):
+            curr = Counter()
+            for pred in preds:
+                curr.update(pred)
+            for k, v in curr.items():
+                if k not in self.special_token_dict.values():
+                    self.word_freq[k] += v
+
+        def calc_weight():
+            RF = self.word_freq / self.word_freq.sum()
+            a = -1 / RF.max()
+            weight = a * RF + 1
+            weight = weight / weight.sum() * len(weight)
+
+            return torch.FloatTensor(weight)
+
+        if labels is not None:
+            preds = clean_preds(logits)
+            update_frequency(preds)
+            self.criterion.weight = calc_weight()
+            no_pad_label = labels[labels != -100]
+            target_tokens = no_pad_label.long().sum().item()
+            div_loss = self.criterion(
+                logits.contiguous().view(-1, logits.size(-1)),
+                labels.contiguous().view(-1),
+            )
+            div_loss /= target_tokens
+
+            return div_loss
+
+        return None
+
+    def compute_empathy_loss(self, context_input_ids=None, context_attention_mask=None,
+                             labels=None, logits=None, response_mask=None):
+        if response_mask is None:
+            response_mask = torch.ones(labels.size())
+
+        # compute empathy loss
+        self.empathy_classifier_model1.eval()
+        self.empathy_classifier_model2.eval()
+        self.empathy_classifier_model3.eval()
+
+        empathy1_preds = self.empathy_classifier_model1.output_from_logits(context_input_ids=context_input_ids,
+                                                                           context_attention_mask=context_attention_mask,
+                                                                           decoded_logits=logits,
+                                                                           response_mask=response_mask)
+        empathy2_preds = self.empathy_classifier_model2.output_from_logits(context_input_ids=context_input_ids,
+                                                                           context_attention_mask=context_attention_mask,
+                                                                           decoded_logits=logits,
+                                                                           response_mask=response_mask)
+        empathy3_preds = self.empathy_classifier_model3.output_from_logits(context_input_ids=context_input_ids,
+                                                                           context_attention_mask=context_attention_mask,
+                                                                           decoded_logits=logits,
+                                                                           response_mask=response_mask)
+        empathy1_labels = torch.ones((empathy1_preds.size()[0]))
+        empathy2_labels = torch.ones((empathy2_preds.size()[0]))
+        empathy3_labels = torch.ones((empathy3_preds.size()[0]))
+
+        loss_fct = CrossEntropyLoss()
+        empathy1_loss = loss_fct(empathy1_preds, empathy1_labels)
+        empathy2_loss = loss_fct(empathy2_preds, empathy2_labels)
+        empathy3_loss = loss_fct(empathy3_preds, empathy3_labels)
+
+        return empathy1_loss + empathy2_loss + empathy3_loss
+
     def compute_loss(self, context_input_ids=None, context_attention_mask=None,
                      labels=None, decoder_outputs=None, response_mask=None, return_dict=True):
         """
@@ -518,37 +602,17 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             loss_fct = CrossEntropyLoss()
             main_loss = loss_fct(logits.reshape(-1, self.decoder.config.vocab_size), labels.view(-1))
 
-            if response_mask is None:
-                response_mask = torch.ones(labels.size())
+            face_loss = self.compute_face_loss(labels=labels, logits=logits)
 
-            # compute empathy loss
-            self.empathy_classifier_model1.eval()
-            self.empathy_classifier_model2.eval()
-            self.empathy_classifier_model3.eval()
-
-            empathy1_preds = self.empathy_classifier_model1.output_from_logits(context_input_ids=context_input_ids,
-                                                                               context_attention_mask=context_attention_mask,
-                                                                               decoded_logits=logits,
-                                                                               response_mask=response_mask)
-            empathy2_preds = self.empathy_classifier_model2.output_from_logits(context_input_ids=context_input_ids,
-                                                                               context_attention_mask=context_attention_mask,
-                                                                               decoded_logits=logits,
-                                                                               response_mask=response_mask)
-            empathy3_preds = self.empathy_classifier_model3.output_from_logits(context_input_ids=context_input_ids,
-                                                                               context_attention_mask=context_attention_mask,
-                                                                               decoded_logits=logits,
-                                                                               response_mask=response_mask)
-            empathy1_labels = torch.ones((empathy1_preds.size()[0]))
-            empathy2_labels = torch.ones((empathy2_preds.size()[0]))
-            empathy3_labels = torch.ones((empathy3_preds.size()[0]))
-
-            empathy1_loss = loss_fct(empathy1_preds, empathy1_labels)
-            empathy2_loss = loss_fct(empathy2_preds, empathy2_labels)
-            empathy3_loss = loss_fct(empathy3_preds, empathy3_labels)
-            total_empathy_loss = empathy1_loss + empathy2_loss + empathy3_loss
-
+            empathy_loss = self.compute_empathy_loss(context_input_ids=context_input_ids,
+                                                     context_attention_mask=context_attention_mask,
+                                                     labels=labels,
+                                                     logits=logits,
+                                                     response_mask=response_mask)
             # aggregate losses
-            loss = self.main_loss_weight * main_loss + self.empathy_loss_weight * total_empathy_loss
+            loss = self.main_loss_weight * main_loss + \
+                   self.empathy_loss_weight * empathy_loss + \
+                   self.div_loss_weight * face_loss
 
         return loss
 
