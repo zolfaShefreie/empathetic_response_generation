@@ -8,7 +8,7 @@ environ.Env.read_env(env_path)
 DATASET_CACHE_PATH = "./data/cache"
 
 MELD_DATASET_PATH = env('MELD_DATASET_PATH', default="./")
-
+EMPATHY_CLASSIFIER_MODELS_PATH = env('EMPATHY_CLASSIFIER_MODELS_PATH', default="./")
 
 #train settings
 DEFAULT_SAVE_DIR_PREFIX = "./models_checkpoint"
