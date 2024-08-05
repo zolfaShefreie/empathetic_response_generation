@@ -113,7 +113,8 @@ class TrainInterface(BaseInterface):
     }
 
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                   max_len=300,
+                                                   source_max_len=300,
+                                                   label_max_len=100,
                                                    new_special_tokens={
                                                        'additional_special_tokens': [
                                                            ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
@@ -142,7 +143,8 @@ class TrainInterface(BaseInterface):
         TextCleaner(texts_key_name='history'),
         ConversationFormatter(history_key_name='history',
                               gen_label_key_name='label',
-                              last_utter_key_name='last_utter'),
+                              last_utter_key_name='last_utter',
+                              utter_sep=None),
         KnowledgeFormatter(social_rel_key_name='social_rel',
                            event_rel_key_name='event_rel',
                            entity_rel_key_name='entity_rel',

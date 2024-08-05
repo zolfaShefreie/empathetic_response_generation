@@ -112,7 +112,7 @@ class TrainInterface(BaseInterface):
     }
 
     CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                   max_len=300,
+                                                   source_max_len=300,
                                                    new_special_tokens={
                                                        'additional_special_tokens': [
                                                            ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],

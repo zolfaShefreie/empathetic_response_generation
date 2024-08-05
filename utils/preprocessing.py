@@ -254,10 +254,11 @@ class ConversationFormatter:
     SPECIAL_TOKEN_SPLIT_UTTERANCE = "<USEP>"
 
     def __init__(self, history_key_name: str = 'history', gen_label_key_name: str = 'label',
-                 last_utter_key_name: str = 'last_utter'):
+                 last_utter_key_name: str = 'last_utter', utter_sep: str = None):
         self.history_key_name = history_key_name
         self.gen_label_key_name = gen_label_key_name
         self.last_utter_key_name = last_utter_key_name
+        self.utter_sep = utter_sep if utter_sep else self.SPECIAL_TOKEN_SPLIT_UTTERANCE
 
     def __call__(self, sample):
         """
@@ -268,7 +269,7 @@ class ConversationFormatter:
         texts = sample[self.history_key_name]
 
         last_utter = texts[-1]
-        conversation = f"{self.SPECIAL_TOKEN_SPLIT_UTTERANCE}".join(texts[:-1])
+        conversation = f"{self.utter_sep}".join(texts[:-1])
         sample[self.history_key_name] = conversation
         sample[self.last_utter_key_name] = last_utter
 
@@ -535,7 +536,8 @@ class ConversationTokenizer:
 
     def __init__(self,
                  tokenizer,
-                 max_len=128,
+                 source_max_len=128,
+                 label_max_len=100,
                  new_special_tokens=None,
                  last_utter_key_name: str = 'last_utter',
                  history_key_name: str = 'history',
@@ -545,11 +547,12 @@ class ConversationTokenizer:
                  context_token_type_key_name: str = 'token_type_ids',
                  gen_label_ids_key_name: str = 'labels',
                  gen_label_mask_key_name: str = 'gen_label_mask',
-                 gen_label_token_type_key_name: str = 'gen_label_token_type',):
+                 gen_label_token_type_key_name: str = 'gen_label_token_type', ):
         """
 
         :param tokenizer:
-        :param max_len:
+        :param source_max_len:
+        :param label_max_len:
         :param new_special_tokens:
         :param last_utter_key_name:
         :param history_key_name:
@@ -567,7 +570,8 @@ class ConversationTokenizer:
         if new_special_tokens:
             self.tokenizer.add_special_tokens(new_special_tokens)
 
-        self.MAX_LEN = max_len
+        self.source_max_len = source_max_len
+        self.label_max_len = label_max_len
         # key_name configs
         self.history_key_name = history_key_name
         self.gen_label_key_name = gen_label_key_name
@@ -587,7 +591,7 @@ class ConversationTokenizer:
         """
         inputs = self.tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
                                             add_special_tokens=True,
-                                            max_length=self.MAX_LEN,
+                                            max_length=self.source_max_len,
                                             padding='max_length',
                                             return_attention_mask=True,
                                             return_token_type_ids=True,
@@ -600,7 +604,7 @@ class ConversationTokenizer:
         if self.gen_label_key_name in sample.keys():
             label = self.tokenizer.encode_plus(sample[self.gen_label_key_name][0],
                                                add_special_tokens=True,
-                                               max_length=self.MAX_LEN,
+                                               max_length=self.label_max_len,
                                                padding='max_length',
                                                return_attention_mask=True,
                                                return_token_type_ids=True,
