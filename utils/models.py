@@ -1,5 +1,6 @@
 import dataclasses
-from transformers import PreTrainedModel, PretrainedConfig, RobertaPreTrainedModel, T5Tokenizer, T5EncoderModel
+from transformers import PreTrainedModel, PretrainedConfig, RobertaPreTrainedModel, T5Tokenizer, T5EncoderModel, \
+    AutoTokenizer
 from transformers.modeling_outputs import ModelOutput
 from typing import Optional
 import torch
@@ -257,7 +258,7 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
 class T5EncoderClassifier(nn.Module):
     """the source of model is from https://github.com/declare-lab/exemplary-empathy but small changes applied"""
-    def __init__(self, size, num_labels=2, strategy=0):
+    def __init__(self, size, base_encoder_nam: str, num_labels=2, strategy=0):
         super().__init__()
 
         if size == "base":
@@ -265,8 +266,9 @@ class T5EncoderClassifier(nn.Module):
         elif size == "large":
             in_features = 1024
 
-        self.tokenizer = T5Tokenizer.from_pretrained("t5-" + size)
-        self.model = T5EncoderModel.from_pretrained("t5-" + size)
+        self.tokenizer = T5Tokenizer.from_pretrained('google-t5/t5-base')
+        self.model = T5EncoderModel.from_pretrained("google-t5/t5-base")
+        self.base_tokenizer = AutoTokenizer.from_pretrained(base_encoder_nam)
         self.classifier = nn.Linear(in_features, num_labels)
         self.strategy = strategy
 
@@ -289,7 +291,13 @@ class T5EncoderClassifier(nn.Module):
             probs = F.gumbel_softmax(logits, tau=1, hard=True)
         return probs
 
-    def output_from_logits(self, context_input_ids, context_attention_mask, decoded_logits, response_mask):
+    def convert_to_own_tokenize(self, context_input_ids):
+        context = self.base_tokenizer.batch_decode(context_input_ids, skip_special_tokens=True)
+        max_len = 768
+        batch = self.tokenizer(context, max_length=max_len, padding=True, truncation=True, return_tensors="pt")
+        return batch['input_ids'], batch['attention_mask']
+
+    def output_from_logits(self, context_input_ids, decoded_logits, response_mask):
         '''
         b: batch_size, l: length of sequence, v: vocabulary size, d: embedding dim
         decoded_probabilities -> (b, l, v)
@@ -298,7 +306,8 @@ class T5EncoderClassifier(nn.Module):
         output -> (b, num_labels)
         '''
         # encode context #
-        context_embeddings = self.model.encoder.embed_tokens(context_input_ids)
+        context_ids, context_mask = self.convert_to_own_tokenize(context_input_ids=context_input_ids)
+        context_embeddings = self.model.encoder.embed_tokens(context_ids)
 
         # encode response #
         decoded_probabilities = self.convert_to_probabilities(decoded_logits)
@@ -307,7 +316,7 @@ class T5EncoderClassifier(nn.Module):
 
         # concatenate #
         merged_embeddings = torch.cat([context_embeddings, response_embeddings], 1)
-        merged_mask = torch.cat([context_attention_mask, response_mask], 1)
+        merged_mask = torch.cat([context_mask, response_mask], 1)
         outputs = self.model(inputs_embeds=merged_embeddings, attention_mask=merged_mask)
         sequence_output = outputs["last_hidden_state"][:, 0, :]
         logits = self.classifier(sequence_output)

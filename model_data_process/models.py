@@ -336,17 +336,17 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         self.criterion = torch.nn.NLLLoss(ignore_index=config.pad_token_id, reduction="sum")
 
         # models for losses
-        self.empathy_classifier_model1 = T5EncoderClassifier("base", 2, 0)
+        self.empathy_classifier_model1 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
         self.empathy_classifier_model1.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600015/model.pt"))
         for param in self.empathy_classifier_model1.parameters():
             param.requires_grad = False
 
-        self.empathy_classifier_model2 = T5EncoderClassifier("base", 2, 0)
+        self.empathy_classifier_model2 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
         self.empathy_classifier_model2.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600805/model.pt"))
         for param in self.empathy_classifier_model2.parameters():
             param.requires_grad = False
 
-        self.empathy_classifier_model3 = T5EncoderClassifier("base", 2, 0)
+        self.empathy_classifier_model3 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
         self.empathy_classifier_model3.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619601340/model.pt"))
         for param in self.empathy_classifier_model3.parameters():
             param.requires_grad = False
@@ -550,8 +550,7 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
 
         return None
 
-    def compute_empathy_loss(self, context_input_ids=None, context_attention_mask=None,
-                             labels=None, logits=None, response_mask=None):
+    def compute_empathy_loss(self, context_input_ids=None, labels=None, logits=None, response_mask=None):
         if response_mask is None:
             response_mask = torch.ones(labels.size())
 
@@ -561,15 +560,12 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         self.empathy_classifier_model3.eval()
 
         empathy1_preds = self.empathy_classifier_model1.output_from_logits(context_input_ids=context_input_ids,
-                                                                           context_attention_mask=context_attention_mask,
                                                                            decoded_logits=logits,
                                                                            response_mask=response_mask)
         empathy2_preds = self.empathy_classifier_model2.output_from_logits(context_input_ids=context_input_ids,
-                                                                           context_attention_mask=context_attention_mask,
                                                                            decoded_logits=logits,
                                                                            response_mask=response_mask)
         empathy3_preds = self.empathy_classifier_model3.output_from_logits(context_input_ids=context_input_ids,
-                                                                           context_attention_mask=context_attention_mask,
                                                                            decoded_logits=logits,
                                                                            response_mask=response_mask)
         empathy1_labels = torch.ones((empathy1_preds.size()[0]))
@@ -605,7 +601,6 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             face_loss = self.compute_face_loss(labels=labels, logits=logits)
 
             empathy_loss = self.compute_empathy_loss(context_input_ids=context_input_ids,
-                                                     context_attention_mask=context_attention_mask,
                                                      labels=labels,
                                                      logits=logits,
                                                      response_mask=response_mask)
