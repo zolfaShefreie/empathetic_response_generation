@@ -214,6 +214,7 @@ class KnowledgesEncoder(PreTrainedModel):
         self.encoder.resize_token_embeddings(kwn_embedding_tokens_len)
         self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
         self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
+        self.norm_layer = torch.nn.LayerNorm(768)
 
     def forward(self,
                 react_rel_input_ids: Optional[torch.LongTensor] = None,
@@ -272,9 +273,10 @@ class KnowledgesEncoder(PreTrainedModel):
                                                                          key=encoded_entity_knw,
                                                                          value=encoded_entity_knw)
 
-        return torch.mean(torch.stack([encoded_social_knw,
-                                       social_event_attention_output,
-                                       social_entity_attention_output]), dim=0) + encoded_react_knw
+        return self.norm_layer(torch.sum(torch.stack([encoded_social_knw,
+                                                      social_event_attention_output,
+                                                      social_entity_attention_output,
+                                                      encoded_react_knw]), dim=0))
 
 
 class TextualResponseGenerator(EncoderDecoderModel, ABC):

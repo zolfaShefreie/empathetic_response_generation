@@ -257,7 +257,7 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
 
 class T5EncoderClassifier(nn.Module):
-    """the source of model is from https://github.com/declare-lab/exemplary-empathy but small changes applied"""
+    """the source of model is from https://github.com/declare-lab/exemplary-empathy but small changes are applied"""
     def __init__(self, size, base_encoder_nam: str, num_labels=2, strategy=0):
         super().__init__()
 
