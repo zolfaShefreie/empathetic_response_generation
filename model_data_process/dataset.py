@@ -373,11 +373,12 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
     FILE_PATH_KEY_NAME = 'file_name'
     AUDIO_DATA_KEY_NAME = 'audio'
 
-    def __init__(self, dataset_dir: str = None, split='train'):
+    def __init__(self, dataset_dir: str = None, split='train', transform = None):
         if dataset_dir is None:
             dataset_dir = self.get_from_huggingface()
         self.data = self.conv_preprocess(split=split, dataset_dir=dataset_dir)
         self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
+        self.transform = transform
         self.n_sample = len(self.data)
 
     @classmethod
