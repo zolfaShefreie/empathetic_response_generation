@@ -1,6 +1,5 @@
 from enum import Enum
-
-import numpy as np
+from huggingface_hub import snapshot_download
 from datasets import load_dataset
 import torch
 import os
@@ -9,9 +8,10 @@ import pandas as pd
 
 from model_data_process.example_retriever import ExampleRetriever
 from utils.preprocessing import NewVersionDialogues
-from settings import DATASET_CACHE_PATH
+from settings import DATASET_CACHE_PATH, HUB_ACCESS_TOKEN
 from model_data_process.knowledge_generator import KnowledgeGenerator
 from utils.audio_util import AudioModule
+from utils.others import unzip
 
 
 class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
@@ -147,7 +147,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         new_dataset = list()
-        train_df = data if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train[:13]',
+        train_df = data if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train',
                                                                                             add_knowledge=True,
                                                                                             add_examples=False)
         train_df = pd.DataFrame(train_df)
@@ -355,6 +355,190 @@ class MELDDataset(torch.utils.data.Dataset):
             'labels': emotion_label,
             'sentiment_label': sentiment_label,
         })
+        if self.transform:
+            return self.transform(item_data)
+        return item_data
+
+    def __len__(self):
+        """
+        length of dataset
+        :return:
+        """
+        return self.n_sample
+
+
+class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
+    REPO_ID = "Shefreie/BiMEmpDialogues_zip"
+    PREFIX = "./data"
+    FILE_PATH_KEY_NAME = 'file_name'
+    AUDIO_DATA_KEY_NAME = 'audio'
+
+    def __init__(self, dataset_dir: str = None, split='train'):
+        if dataset_dir is None:
+            dataset_dir = self.get_from_huggingface()
+        self.data = self.conv_preprocess(split=split, dataset_dir=dataset_dir)
+        self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
+        self.n_sample = len(self.data)
+
+    @classmethod
+    def conv_preprocess(cls, dataset_dir: str,  split: str, add_knowledge: bool = True, add_examples: bool = True) -> list:
+        """
+        change the format of dataset
+        :param dataset_dir:
+        :param add_examples:
+        :param split: train/test/validation
+        :param add_knowledge: add knowledge to each conversation
+        :return: dataset with new format
+        """
+        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"
+        if os.path.exists(file_path):
+            # load data from cache
+            with open(file_path, mode='r', encoding='utf-8') as file:
+                content = file.read()
+                return ast.literal_eval(content)
+
+        else:
+            # reformat empathetic_dialogues dataset
+            raw_dataset = pd.read_csv(f"{dataset_dir}/{split}/metadata.csv")
+            raw_dataset = raw_dataset.to_dict('records')
+            process_manager = NewVersionDialogues(conv_id_key_name='conv_id',
+                                                  turn_key_name='utter_id',
+                                                  utter_key_name='utterance',
+                                                  other_conv_features=[],
+                                                  other_utter_features=['speaker', 'file_name', 'Emotion',
+                                                                        'Sentiment', 'emotion', 'act', 'scam',
+                                                                        'client_talk_type', 'main_therapist_behaviour'],
+                                                  new_conv_each_sys_responses=True,
+                                                  responses_in_history=True,
+                                                  context_key_name='history',
+                                                  label_key_name='label')
+            data = process_manager.two_party_reformat(raw_dataset=raw_dataset)
+
+            if add_knowledge:
+                data = cls._add_knowledge_to_conv(dataset=data)
+
+            if add_examples:
+                data = cls.add_examples(data=data, split=split)
+
+            # save dataset on cache'_
+            if not os.path.exists(os.path.dirname(file_path)):
+                try:
+                    os.makedirs(os.path.dirname(file_path))
+                except OSError as exc:
+                    print(exc)
+                    pass
+            with open(file_path, mode='w', encoding='utf-8') as file:
+                file.write(str(data))
+
+            return data
+
+    @classmethod
+    def _add_knowledge_to_conv(cls, dataset):
+        """
+        add knowledge to dataset
+        :param dataset:
+        :return:
+        """
+        knw_added_dataset = list()
+
+        for record in dataset:
+            social, event, entity = KnowledgeGenerator.run(texts=record['history'])
+            record_plus_knw = {cls.SOCIAL_REL_KEY_NAME: social,
+                               cls.EVENT_REL_KEY_NAME: event,
+                               cls.ENTITY_REL_KEY_NAME: entity}
+            record_plus_knw.update(record)
+            knw_added_dataset.append(record_plus_knw)
+
+        return knw_added_dataset
+
+    @classmethod
+    def add_examples(cls, data: list, split: str) -> list:
+        """
+        add examples to one record
+        :param data:
+        :param split:
+        :return:
+        """
+        new_dataset = list()
+        train_df = data if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train',
+                                                                                            add_knowledge=True,
+                                                                                            add_examples=False)
+        train_df = pd.DataFrame(train_df)
+        train_df['xReact'] = train_df['social_rel'].apply(lambda x: list(x.values())[0]['xReact'])
+        train_df['history_str'] = train_df['history'].apply(lambda x: ", ".join(x))
+        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
+                                             conv_key_name='original_conv_id')
+
+        for record in data:
+            record['history_str'] = ", ".join(record['history'])
+            record['xReact'] = list(record['social_rel'].values())[0]['xReact']
+            record = example_retriever(record)
+            new_dataset.append(record)
+
+        return new_dataset
+
+    @classmethod
+    def _audio_file_preprocessing(cls, data: list, dataset_path: str, split: str) -> list:
+        """
+        extract audio and get data of it
+        :param data:
+        :return:
+        """
+
+        def get_path(row):
+            """
+            get path of audio file
+            :param row:
+            :return:
+            """
+            file_path_last_utter = row[cls.FILE_PATH_KEY_NAME][-1]
+            return f"{dataset_path}/{split}/{file_path_last_utter}"
+
+        processed_data = list()
+
+        for record in data:
+            audio_file_path = get_path(record)
+
+            # if there are some problems with file, the record won't get considered as a record of dataset
+            try:
+                record[cls.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=audio_file_path)
+                processed_data.append(record)
+
+            except Exception as e:
+                pass
+
+        return processed_data
+
+    @classmethod
+    def get_from_huggingface(cls):
+        if not os.path.exists(f"{cls.PREFIX}/BiMEmpDialogues"):
+            zip_path = snapshot_download(repo_id=cls.REPO_ID,
+                                         repo_type="dataset",
+                                         cache_dir=cls.PREFIX,
+                                         token=HUB_ACCESS_TOKEN)
+
+            unzip(zip_path=f"{zip_path}/{cls.REPO_ID.split('/')[-1]}", des_path=cls.PREFIX)
+        return f"{cls.PREFIX}/BiMEmpDialogues"
+
+    def __getitem__(self, idx: int):
+        """
+        get item with specific index using dataset[idx]
+        :param idx: index
+        :return:
+        """
+        raw_item_data = self.data[idx].copy()
+        history, label = raw_item_data['history'], raw_item_data['label']
+        item_data = {'history': history, 'label': label, 'audio': raw_item_data['audio']}
+        if self.SOCIAL_REL_KEY_NAME in raw_item_data.keys():
+            item_data.update({
+                self.SOCIAL_REL_KEY_NAME: raw_item_data[self.SOCIAL_REL_KEY_NAME],
+                self.EVENT_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME],
+                self.ENTITY_REL_KEY_NAME: raw_item_data[self.ENTITY_REL_KEY_NAME]
+            })
+        if ExampleRetriever.EXAMPLE_KEY_NAME in raw_item_data.keys():
+            item_data.update({
+                ExampleRetriever.EXAMPLE_KEY_NAME: raw_item_data[ExampleRetriever.EXAMPLE_KEY_NAME]
+            })
         if self.transform:
             return self.transform(item_data)
         return item_data
