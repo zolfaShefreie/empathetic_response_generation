@@ -258,7 +258,7 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
 class T5EncoderClassifier(nn.Module):
     """the source of model is from https://github.com/declare-lab/exemplary-empathy but small changes are applied"""
-    def __init__(self, size, base_encoder_nam: str, num_labels=2, strategy=0):
+    def __init__(self, size, base_encoder_nam: str, num_labels=2, strategy=0, target_max_len=100, ctx_max_len=300):
         super().__init__()
 
         if size == "base":
@@ -271,6 +271,8 @@ class T5EncoderClassifier(nn.Module):
         self.base_tokenizer = AutoTokenizer.from_pretrained(base_encoder_nam)
         self.classifier = nn.Linear(in_features, num_labels)
         self.strategy = strategy
+        self.target_max_len = target_max_len
+        self.ctx_max_len = ctx_max_len
 
     def forward(self, context, response):
         max_len = 768
@@ -291,9 +293,8 @@ class T5EncoderClassifier(nn.Module):
             probs = F.gumbel_softmax(logits, tau=1, hard=True)
         return probs
 
-    def convert_to_own_tokenize(self, context_input_ids):
+    def convert_to_own_tokenize(self, context_input_ids, max_len=768):
         context = self.base_tokenizer.batch_decode(context_input_ids, skip_special_tokens=True)
-        max_len = 768
         batch = self.tokenizer(context, max_length=max_len, padding=True, truncation=True, return_tensors="pt")
         return batch['input_ids'], batch['attention_mask']
 
@@ -310,13 +311,18 @@ class T5EncoderClassifier(nn.Module):
         context_embeddings = self.model.encoder.embed_tokens(context_ids)
 
         # encode response #
-        decoded_probabilities = self.convert_to_probabilities(decoded_logits)
         embedding_weights = self.model.encoder.embed_tokens.weight
-        response_embeddings = torch.einsum("blv, vd->bld", decoded_probabilities, embedding_weights)
+        decoded_probabilities = self.convert_to_probabilities(decoded_logits)
+        generated_response = torch.argmax(decoded_probabilities, dim=2)
+        response_input_ids, response_att_mask = self.convert_to_own_tokenize(generated_response,
+                                                                             max_len=self.target_max_len)
+        response_one_hot = torch.nn.functional.one_hot(response_input_ids, num_classes=embedding_weights.size()[0]).\
+            type(torch.float)
+        response_embeddings = torch.einsum("blv, vd->bld", response_one_hot, embedding_weights)
 
         # concatenate #
         merged_embeddings = torch.cat([context_embeddings, response_embeddings], 1)
-        merged_mask = torch.cat([context_mask, response_mask], 1)
+        merged_mask = torch.cat([context_mask, response_att_mask], 1)
         outputs = self.model(inputs_embeds=merged_embeddings, attention_mask=merged_mask)
         sequence_output = outputs["last_hidden_state"][:, 0, :]
         logits = self.classifier(sequence_output)

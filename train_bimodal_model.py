@@ -116,7 +116,7 @@ class TrainInterface(BaseInterface):
                                                    source_max_len=300,
                                                    label_max_len=100,
                                                    new_special_tokens={
-                                                       'pad_token': '[PAD]'
+                                                       'pad_token': '<pad>'
                                                    },
                                                    last_utter_key_name='last_utter',
                                                    history_key_name='history',

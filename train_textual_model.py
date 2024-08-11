@@ -120,7 +120,7 @@ class TrainInterface(BaseInterface):
                                                    #         ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
                                                    #     'pad_token': '[PAD]'},
                                                    new_special_tokens={
-                                                       'pad_token': '[PAD]'
+                                                       'pad_token': '<pad>'
                                                    },
                                                    last_utter_key_name='last_utter',
                                                    history_key_name='history',

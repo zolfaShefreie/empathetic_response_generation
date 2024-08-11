@@ -339,17 +339,25 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
 
         # models for losses
         self.empathy_classifier_model1 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
-        self.empathy_classifier_model1.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600015/model.pt"))
+        self.empathy_classifier_model1.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600015/model.pt",
+                                                                  map_location=torch.device('cpu') if not torch.cuda.is_available()
+                                                                  else torch.device("cuda")))
         for param in self.empathy_classifier_model1.parameters():
             param.requires_grad = False
 
         self.empathy_classifier_model2 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
-        self.empathy_classifier_model2.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600805/model.pt"))
+        self.empathy_classifier_model2.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600805/model.pt",
+                                                                  map_location=torch.device(
+                                                                      'cpu') if not torch.cuda.is_available()
+                                                                  else torch.device("cuda")))
         for param in self.empathy_classifier_model2.parameters():
             param.requires_grad = False
 
         self.empathy_classifier_model3 = T5EncoderClassifier("base", 'roberta-base', 2, 0)
-        self.empathy_classifier_model3.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619601340/model.pt"))
+        self.empathy_classifier_model3.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619601340/model.pt",
+                                                                  map_location=torch.device(
+                                                                      'cpu') if not torch.cuda.is_available()
+                                                                  else torch.device("cuda")))
         for param in self.empathy_classifier_model3.parameters():
             param.requires_grad = False
 
@@ -488,7 +496,8 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         )
 
         # Compute loss independent from decoder (as some shift the logits inside them)
-        loss = self.compute_loss(labels=labels, decoder_outputs=decoder_outputs, return_dict=return_dict)
+        loss = self.compute_loss(context_input_ids=input_ids, labels=labels, decoder_outputs=decoder_outputs,
+                                 return_dict=return_dict)
 
         if not return_dict:
             if loss is not None:
@@ -536,18 +545,22 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
 
             return torch.FloatTensor(weight)
 
+        device = 'cpu'
+
         if labels is not None:
             preds = clean_preds(logits)
             update_frequency(preds)
-            self.criterion.weight = calc_weight()
+            self.criterion.weight = calc_weight().to(device)
             no_pad_label = labels[labels != -100]
             target_tokens = no_pad_label.long().sum().item()
+            pad_labels = labels.clone().detach()
+            pad_labels[pad_labels == -100] = self.config.pad_token_id
             div_loss = self.criterion(
-                logits.contiguous().view(-1, logits.size(-1)),
-                labels.contiguous().view(-1),
+                logits.contiguous().view(-1, logits.size(-1)).to(device),
+                pad_labels.contiguous().view(-1).to(device),
             )
-            div_loss /= target_tokens
 
+            div_loss /= target_tokens
             return div_loss
 
         return None
@@ -570,9 +583,10 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         empathy3_preds = self.empathy_classifier_model3.output_from_logits(context_input_ids=context_input_ids,
                                                                            decoded_logits=logits,
                                                                            response_mask=response_mask)
-        empathy1_labels = torch.ones((empathy1_preds.size()[0]))
-        empathy2_labels = torch.ones((empathy2_preds.size()[0]))
-        empathy3_labels = torch.ones((empathy3_preds.size()[0]))
+
+        empathy1_labels = torch.ones((empathy1_preds.size()[0])).type(torch.long)
+        empathy2_labels = torch.ones((empathy2_preds.size()[0])).type(torch.long)
+        empathy3_labels = torch.ones((empathy3_preds.size()[0])).type(torch.long)
 
         loss_fct = CrossEntropyLoss()
         empathy1_loss = loss_fct(empathy1_preds, empathy1_labels)
