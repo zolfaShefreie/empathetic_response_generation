@@ -306,24 +306,24 @@ class T5EncoderClassifier(nn.Module):
         embedding_weights -> (v, d)
         output -> (b, num_labels)
         '''
+        device = 'cpu' if not torch.cuda.is_available() else 'cuda'
         # encode context #
         context_ids, context_mask = self.convert_to_own_tokenize(context_input_ids=context_input_ids)
-        context_embeddings = self.model.encoder.embed_tokens(context_ids)
+        context_ids = context_ids.to(device)
+        context_mask = context_mask.to(device)
 
         # encode response #
-        embedding_weights = self.model.encoder.embed_tokens.weight
         decoded_probabilities = self.convert_to_probabilities(decoded_logits)
         generated_response = torch.argmax(decoded_probabilities, dim=2)
         response_input_ids, response_att_mask = self.convert_to_own_tokenize(generated_response,
                                                                              max_len=self.target_max_len)
-        response_one_hot = torch.nn.functional.one_hot(response_input_ids, num_classes=embedding_weights.size()[0]).\
-            type(torch.float)
-        response_embeddings = torch.einsum("blv, vd->bld", response_one_hot, embedding_weights)
+        response_input_ids = response_input_ids.to(device)
+        response_att_mask = response_att_mask.to(device)
 
         # concatenate #
-        merged_embeddings = torch.cat([context_embeddings, response_embeddings], 1)
+        merged_input_ids = torch.cat([context_ids, response_input_ids], 1)
         merged_mask = torch.cat([context_mask, response_att_mask], 1)
-        outputs = self.model(inputs_embeds=merged_embeddings, attention_mask=merged_mask)
+        outputs = self.model(input_ids=merged_input_ids.to(device), attention_mask=merged_mask.to(device))
         sequence_output = outputs["last_hidden_state"][:, 0, :]
         logits = self.classifier(sequence_output)
         return logits
