@@ -368,10 +368,17 @@ class MELDDataset(torch.utils.data.Dataset):
 
 
 class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
+
     REPO_ID = "Shefreie/BiMEmpDialogues_zip"
     PREFIX = "./data"
     FILE_PATH_KEY_NAME = 'file_name'
     AUDIO_DATA_KEY_NAME = 'audio'
+    DATASET_NAME = "BiMEmpDialogues"
+    CACHE_PATH = DATASET_CACHE_PATH
+
+    SOCIAL_REL_KEY_NAME = 'social_rel'
+    EVENT_REL_KEY_NAME = 'event_rel'
+    ENTITY_REL_KEY_NAME = 'entity_rel'
 
     def __init__(self, dataset_dir: str = None, split='train', transform=None):
         if dataset_dir is None:
@@ -518,7 +525,7 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                                          cache_dir=cls.PREFIX,
                                          token=HUB_ACCESS_TOKEN)
 
-            unzip(zip_path=f"{zip_path}/{cls.REPO_ID.split('/')[-1]}", des_path=cls.PREFIX)
+            unzip(zip_path=f"{zip_path}/BiMEmpDialouges.zip", des_path=cls.PREFIX)
         return f"{cls.PREFIX}/BiMEmpDialogues"
 
     def __getitem__(self, idx: int):
@@ -550,4 +557,3 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         return self.n_sample
-
