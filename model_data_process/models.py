@@ -496,8 +496,9 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         )
 
         # Compute loss independent from decoder (as some shift the logits inside them)
-        loss = self.compute_loss(context_input_ids=input_ids, labels=labels, decoder_outputs=decoder_outputs,
-                                 return_dict=return_dict)
+        loss, other_loss_dict = self.compute_loss(context_input_ids=input_ids, labels=labels,
+                                                  decoder_outputs=decoder_outputs,
+                                                  return_dict=return_dict)
 
         if not return_dict:
             if loss is not None:
@@ -505,7 +506,7 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             else:
                 return decoder_outputs + encoder_outputs
 
-        return Seq2SeqLMOutput(
+        output = Seq2SeqLMOutput(
             loss=loss,
             logits=decoder_outputs.logits,
             past_key_values=decoder_outputs.past_key_values,
@@ -516,6 +517,11 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+
+        for key, value in other_loss_dict.items():
+            output[key] = value
+
+        return output
 
     def compute_face_loss(self, labels=None, logits=None):
         """
@@ -626,7 +632,9 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
                    self.empathy_loss_weight * empathy_loss + \
                    self.div_loss_weight * face_loss
 
-        return loss
+            return loss, {'main_loss': main_loss, 'empathy_loss': empathy_loss, 'face_loss': face_loss}
+        
+        return loss, {}
 
     def encode_context(self,
                        input_ids: Optional[torch.LongTensor] = None,
