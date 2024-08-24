@@ -280,7 +280,6 @@ class TrainerMultiLoss(Trainer):
             # update tr_total_other_losses
             self.tr_total_other_losses.update({key: value + self.tr_total_other_losses.get(key, 0.0)
                                                for key, value in tr_other_losses.items()})
-            print("_maybe_log_save_evaluate", self.tr_total_other_losses)
             self._globalstep_last_logged = self.state.global_step
             self.store_flos()
 
@@ -330,10 +329,8 @@ class TrainerMultiLoss(Trainer):
         # end of train
         if "train_loss" in output:
             total_other_train_loss = self._calculate_tr_total_other_losses()
-            print(total_other_train_loss)
             output.update(total_other_train_loss)
             logs.update(total_other_train_loss)
-            print(logs)
 
         # end of eval
         if "eval_loss" in output:
