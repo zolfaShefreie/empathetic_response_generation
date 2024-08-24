@@ -13,6 +13,8 @@ from transformers import RobertaTokenizer, Seq2SeqTrainingArguments, Seq2SeqTrai
     EarlyStoppingCallback, trainer_utils, AlbertTokenizer, AutoFeatureExtractor
 import argparse
 
+from utils.trainer import Seq2SeqTrainerMultiLoss
+
 
 class TrainInterface(BaseInterface):
     DESCRIPTION = "You can run the train process using this interface"
@@ -238,7 +240,7 @@ class TrainInterface(BaseInterface):
                                 main_loss_weight=1,
                                 empathy_loss_weight=0.1)
 
-        trainer = Seq2SeqTrainer(
+        trainer = Seq2SeqTrainerMultiLoss(
             model=model,
             args=self.get_training_args(),
             train_dataset=train_dataset,

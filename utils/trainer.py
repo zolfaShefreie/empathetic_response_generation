@@ -159,7 +159,7 @@ class TrainerMultiLoss(Trainer):
             labels = None
         outputs = model(**inputs)
 
-        self._update_other_loss_new_step(outputs)
+        self._update_other_loss_new_step(outputs, is_eval=is_eval)
 
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
@@ -279,8 +279,8 @@ class TrainerMultiLoss(Trainer):
             self._total_loss_scalar += tr_loss_scalar
             # update tr_total_other_losses
             self.tr_total_other_losses.update({key: value + self.tr_total_other_losses.get(key, 0.0)
-                                               for key, value in tr_other_losses.items()
-                                               if key in self.tr_total_other_losses})
+                                               for key, value in tr_other_losses.items()})
+            print("_maybe_log_save_evaluate", self.tr_total_other_losses)
             self._globalstep_last_logged = self.state.global_step
             self.store_flos()
 
@@ -329,11 +329,17 @@ class TrainerMultiLoss(Trainer):
 
         # end of train
         if "train_loss" in output:
-            output.update(self._calculate_tr_total_other_losses())
+            total_other_train_loss = self._calculate_tr_total_other_losses()
+            print(total_other_train_loss)
+            output.update(total_other_train_loss)
+            logs.update(total_other_train_loss)
+            print(logs)
 
         # end of eval
         if "eval_loss" in output:
-            output.update(self._calculate_eval_other_losses())
+            total_eval_other_loss = self._calculate_eval_other_losses()
+            output.update(total_eval_other_loss)
+            logs.update(total_eval_other_loss)
             self._reset_other_losses(is_eval=True)
 
         self.state.log_history.append(output)
@@ -544,7 +550,7 @@ class MultiTaskTrainer(Seq2SeqTrainerMultiLoss):
             else:
                 if has_labels or loss_without_labels:
                     with self.compute_loss_context_manager():
-                        loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+                        loss, outputs = self.compute_loss(model, inputs, return_outputs=True, is_eval=True)
                     loss = loss.mean().detach()
 
                     if generated_tokens is not None:
