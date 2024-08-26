@@ -1,38 +1,49 @@
 from utils.interface import BaseInterface
-from model_data_process.dataset import MELDDataset
-from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTokenizer, TextCleaner, ToTensor, \
-    ToNumpy, ToLong, FilterSample, AudioFeatureExtractor
-from model_data_process import models
-from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_CLASSIFIER_MODEL_ID, HUB_ACCESS_TOKEN, HUB_CLASSIFIER_PRIVATE_REPO, \
-    MELD_DATASET_PATH
+from model_data_process.data_model_mapping import MultiModalResponseGeneratorConfig, TextualResponseGeneratorConfig,\
+    EmotionalTextualResponseGeneratorConfig, MultiModelEmotionClassifierConfig
 from utils.callbacks import SaveHistoryCallback
-from utils.metrics import Metrics
 
-from transformers import RobertaTokenizer, DefaultFlowCallback, TrainingArguments, Trainer, \
-    EarlyStoppingCallback, trainer_utils, AutoFeatureExtractor
+from transformers import Seq2SeqTrainingArguments, DefaultFlowCallback, EarlyStoppingCallback, trainer_utils, \
+    TrainingArguments
 import argparse
 
 
 class TrainInterface(BaseInterface):
     DESCRIPTION = "You can run the train process using this interface"
 
+    MAP_CONFIGS = {
+        'BiModalResponseGenerator': MultiModalResponseGeneratorConfig,
+        'BiModalEmotionClassifier': MultiModelEmotionClassifierConfig,
+        'EmotionalTextualResponseGenerator': EmotionalTextualResponseGeneratorConfig,
+        'TextualResponseGenerator': TextualResponseGeneratorConfig
+    }
+
     ARGUMENTS = {
+        'model': {
+            'help': 'train which model?',
+            'choices': MAP_CONFIGS.keys(),
+            'required': True
+        },
+
         'number_of_epochs': {
             'help': 'number of training epoch. it must be positive integer',
             'type': int,
             'required': True
         },
+
         'save_dir': {
             'help': 'diractory of model',
             'required': False,
             'default': None
         },
+
         'evaluation_strategy': {
             'help': ' The evaluation strategy to adopt during training.',
             'choices': ['steps', 'epoch', 'no'],
             'required': False,
             'default': 'epoch'
         },
+
         'eval_steps': {
             'help': 'Number of update steps between two evaluations if evaluation_strategy="steps"',
             'type': int,
@@ -111,47 +122,27 @@ class TrainInterface(BaseInterface):
         },
     }
 
-    CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                   source_max_len=300,
-                                                   new_special_tokens={
-                                                       'additional_special_tokens': [
-                                                           ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
-                                                       'pad_token': '[PAD]'},
-                                                   last_utter_key_name='last_utter',
-                                                   history_key_name='history',
-                                                   gen_label_key_name='label',
-                                                   context_ids_key_name='input_ids',
-                                                   context_mask_key_name='attention_mask',
-                                                   context_token_type_key_name='token_type_ids',
-                                                   gen_label_ids_key_name=None)
-
-    TRANSFORMS = Pipeline(functions=[
-        TextCleaner(texts_key_name='history'),
-        ConversationFormatter(history_key_name='history',
-                              last_utter_key_name='last_utter'),
-        ToNumpy(unwanted_keys=['audio']),
-        CONVERSATION_TOKENIZER,
-        AudioFeatureExtractor(feature_extractor=AutoFeatureExtractor.from_pretrained("facebook/data2vec-audio-base-960h"),
-                              audio_key_name='audio',
-                              result_prefix_key_name='audio'),
-        FilterSample(wanted_keys=['input_ids', 'attention_mask', 'token_type_ids', 'audio_input_values',
-                                  'audio_attention_mask', 'labels', ]),
-        ToTensor(),
-        ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'audio_attention_mask']),
-    ])
-
     def validate_number_of_epochs(self, value):
         if value <= 0:
             raise argparse.ArgumentTypeError(f"{value} is an invalid positive int value")
         return value
 
-    def get_training_args(self):
-        """
-        set trainer based on arguments of model
-        :return:
-        """
-        return TrainingArguments(
-            output_dir=self.save_dir if self.save_dir is not None else f"{DEFAULT_SAVE_DIR_PREFIX}/emotion_recognition",
+    def _run_main_process(self):
+        config = self.MAP_CONFIGS[self.model]()
+
+        train_dataset = config.DatasetClass(**config.dataset_args(split='train'))
+        val_dataset = config.DatasetClass(**config.dataset_args(split='validation'))
+
+        model_class = config.ModelClass
+
+        try:
+            model = model_class.from_pretrained(config.hub_args()['hub_model_id'], token=config.hub_args()['hub_token'])
+        except Exception as e:
+            model = model_class(**config.model_args())
+
+        addition_args = {'predict_with_generate': True} if self.model != 'BiModalEmotionClassifier' else {}
+        trainer_args = Seq2SeqTrainingArguments if self.model != 'BiModalEmotionClassifier' else TrainingArguments(
+            output_dir=self.save_dir if self.save_dir is not None else config.default_save_dir(),
             overwrite_output_dir=True,
             evaluation_strategy=self.evaluation_strategy,
             eval_steps=self.eval_steps,
@@ -174,32 +165,18 @@ class TrainInterface(BaseInterface):
 
             # hub configs
             push_to_hub=self.push_to_hub,
-            hub_model_id=HUB_CLASSIFIER_MODEL_ID,
             hub_strategy='checkpoint',
-            hub_private_repo=HUB_CLASSIFIER_PRIVATE_REPO,
             resume_from_checkpoint='last-checkpoint',
-            hub_token=HUB_ACCESS_TOKEN,
             save_safetensors=False,
+            **{**addition_args, **config.hub_args()}
         )
 
-    def _run_main_process(self):
-
-        train_dataset = MELDDataset(split='train', transform=self.TRANSFORMS, dataset_path=MELD_DATASET_PATH)
-        val_dataset = MELDDataset(split='validation', transform=self.TRANSFORMS, dataset_path=MELD_DATASET_PATH)
-
-        model_class = models.MultiModelEmotionClassifier
-        try:
-            model = model_class.from_pretrained(HUB_CLASSIFIER_MODEL_ID, token=HUB_ACCESS_TOKEN)
-        except Exception as e:
-            model = model_class(num_classes=7, embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer))
-
-        trainer = Trainer(
+        trainer = config.TrainerClass(
             model=model,
-            args=self.get_training_args(),
+            args=trainer_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            compute_metrics=Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
-                                    task_list=['classifier']).compute,
+            compute_metrics=config.metric_func(),
             callbacks=[SaveHistoryCallback(),
                        DefaultFlowCallback(),
                        EarlyStoppingCallback(early_stopping_patience=2)]

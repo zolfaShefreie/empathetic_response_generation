@@ -15,7 +15,7 @@ from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor
 
 class MultiModalResponseGeneratorConfig:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
         initial of class obj
         :param source_max_len:
@@ -138,7 +138,7 @@ class MultiModalResponseGeneratorConfig:
 
 class TextualResponseGeneratorConfig:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
 
         :param source_max_len:
@@ -256,7 +256,7 @@ class TextualResponseGeneratorConfig:
 
 class EmotionalTextualResponseGeneratorConfig:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
 
         :param source_max_len:
@@ -377,7 +377,7 @@ class EmotionalTextualResponseGeneratorConfig:
 
 class MultiModelEmotionClassifierConfig:
 
-    def __init__(self, source_max_len: int = 300):
+    def __init__(self, source_max_len: int = 300, *args, **kwargs):
 
         self.DatasetClass = MELDDataset
         self.ModelClass = MultiModelEmotionClassifier
