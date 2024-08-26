@@ -252,8 +252,14 @@ class TrainInterface(BaseInterface):
                        EarlyStoppingCallback(early_stopping_patience=2)]
         )
 
-        trainer.train(resume_from_checkpoint=None if trainer_utils.get_last_checkpoint(trainer.args.output_dir) is None else True)
-        trainer.save_model()
+        train_is_done = False
+        while not train_is_done:
+            try:
+                trainer.train(resume_from_checkpoint=None if trainer_utils.get_last_checkpoint(trainer.args.output_dir) is None else True)
+                trainer.save_model()
+                train_is_done = True
+            except Exception as e:
+                print(e)
 
 
 if __name__ == "__main__":
