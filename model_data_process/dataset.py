@@ -380,11 +380,13 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
     EVENT_REL_KEY_NAME = 'event_rel'
     ENTITY_REL_KEY_NAME = 'entity_rel'
 
-    def __init__(self, dataset_dir: str = None, split='train', transform=None):
+    def __init__(self, dataset_dir: str = None, split='train', transform=None, include_audio: bool = True):
         if dataset_dir is None:
             dataset_dir = self.get_from_huggingface()
         self.data = self.conv_preprocess(split=split, dataset_dir=dataset_dir)
-        self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
+        self.include_audio = include_audio
+        if include_audio:
+            self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
         self.transform = transform
         self.n_sample = len(self.data)
 
@@ -536,17 +538,22 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         """
         raw_item_data = self.data[idx].copy()
         history, label = raw_item_data['history'], raw_item_data['label']
-        item_data = {'history': history, 'label': label, 'audio': raw_item_data['audio']}
+        item_data = {'history': history, 'label': label}
+        if self.include_audio:
+            item_data['audio'] = raw_item_data['audio']
+
         if self.SOCIAL_REL_KEY_NAME in raw_item_data.keys():
             item_data.update({
                 self.SOCIAL_REL_KEY_NAME: raw_item_data[self.SOCIAL_REL_KEY_NAME],
                 self.EVENT_REL_KEY_NAME: raw_item_data[self.EVENT_REL_KEY_NAME],
                 self.ENTITY_REL_KEY_NAME: raw_item_data[self.ENTITY_REL_KEY_NAME]
             })
+
         if ExampleRetriever.EXAMPLE_KEY_NAME in raw_item_data.keys():
             item_data.update({
                 ExampleRetriever.EXAMPLE_KEY_NAME: raw_item_data[ExampleRetriever.EXAMPLE_KEY_NAME]
             })
+
         if self.transform:
             return self.transform(item_data)
         return item_data
