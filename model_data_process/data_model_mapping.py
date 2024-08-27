@@ -10,7 +10,8 @@ from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_ACCESS_TOKEN, MELD_DATASET_PAT
 from utils.metrics import Metrics
 from utils.trainer import Seq2SeqTrainerMultiLoss, MultiTaskTrainer
 
-from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor, Trainer
+from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor, Trainer, Seq2SeqTrainingArguments, \
+    TrainingArguments
 
 
 class MultiModalResponseGeneratorConfig:
@@ -135,6 +136,45 @@ class MultiModalResponseGeneratorConfig:
         """
         return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['text_generator', ]).compute
 
+    def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+                           save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
+                           save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
+                           per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+
+        return Seq2SeqTrainingArguments(
+            predict_with_generate=True,
+            output_dir=save_dir if save_dir is not None else self.default_save_dir(),
+            overwrite_output_dir=True,
+            evaluation_strategy=evaluation_strategy,
+            eval_steps=eval_steps,
+            save_steps=save_steps,
+            logging_steps=logging_steps,
+            do_train=True,
+            do_eval=True,
+            learning_rate=learning_rate,
+            lr_scheduler_type='constant',
+            save_strategy=save_strategy,
+            per_device_train_batch_size=per_device_train_batch_size,
+            per_device_eval_batch_size=per_device_eval_batch_size,
+            num_train_epochs=number_of_epochs,
+
+            # config for load and save best model
+            load_best_model_at_end=load_best_model_at_end,
+            save_total_limit=save_total_limit,
+            metric_for_best_model='loss',
+            greater_is_better=False,
+
+            # hub configs
+            push_to_hub=push_to_hub,
+            hub_model_id=self.hub_args()['hub_model_id'],
+            hub_private_repo=self.hub_args()['hub_private_repo'],
+            hub_token=self.hub_args()['hub_token'],
+            hub_strategy='checkpoint',
+            resume_from_checkpoint='last-checkpoint',
+            save_safetensors=False,
+        )
+
 
 class TextualResponseGeneratorConfig:
 
@@ -252,6 +292,45 @@ class TextualResponseGeneratorConfig:
         :return:
         """
         return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['text_generator', ]).compute
+
+    def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+                           save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
+                           save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
+                           per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+
+        return Seq2SeqTrainingArguments(
+            predict_with_generate=True,
+            output_dir=save_dir if save_dir is not None else self.default_save_dir(),
+            overwrite_output_dir=True,
+            evaluation_strategy=evaluation_strategy,
+            eval_steps=eval_steps,
+            save_steps=save_steps,
+            logging_steps=logging_steps,
+            do_train=True,
+            do_eval=True,
+            learning_rate=learning_rate,
+            lr_scheduler_type='constant',
+            save_strategy=save_strategy,
+            per_device_train_batch_size=per_device_train_batch_size,
+            per_device_eval_batch_size=per_device_eval_batch_size,
+            num_train_epochs=number_of_epochs,
+
+            # config for load and save best model
+            load_best_model_at_end=load_best_model_at_end,
+            save_total_limit=save_total_limit,
+            metric_for_best_model='loss',
+            greater_is_better=False,
+
+            # hub configs
+            push_to_hub=push_to_hub,
+            hub_model_id=self.hub_args()['hub_model_id'],
+            hub_private_repo=self.hub_args()['hub_private_repo'],
+            hub_token=self.hub_args()['hub_token'],
+            hub_strategy='checkpoint',
+            resume_from_checkpoint='last-checkpoint',
+            save_safetensors=False,
+        )
 
 
 class EmotionalTextualResponseGeneratorConfig:
@@ -374,6 +453,45 @@ class EmotionalTextualResponseGeneratorConfig:
         return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
                        task_list=['text_generator', 'classifier']).compute
 
+    def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+                           save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
+                           save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
+                           per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+
+        return Seq2SeqTrainingArguments(
+            predict_with_generate=True,
+            output_dir=save_dir if save_dir is not None else self.default_save_dir(),
+            overwrite_output_dir=True,
+            evaluation_strategy=evaluation_strategy,
+            eval_steps=eval_steps,
+            save_steps=save_steps,
+            logging_steps=logging_steps,
+            do_train=True,
+            do_eval=True,
+            learning_rate=learning_rate,
+            lr_scheduler_type='constant',
+            save_strategy=save_strategy,
+            per_device_train_batch_size=per_device_train_batch_size,
+            per_device_eval_batch_size=per_device_eval_batch_size,
+            num_train_epochs=number_of_epochs,
+
+            # config for load and save best model
+            load_best_model_at_end=load_best_model_at_end,
+            save_total_limit=save_total_limit,
+            metric_for_best_model='loss',
+            greater_is_better=False,
+
+            # hub configs
+            push_to_hub=push_to_hub,
+            hub_model_id=self.hub_args()['hub_model_id'],
+            hub_private_repo=self.hub_args()['hub_private_repo'],
+            hub_token=self.hub_args()['hub_token'],
+            hub_strategy='checkpoint',
+            resume_from_checkpoint='last-checkpoint',
+            save_safetensors=False,
+        )
+
 
 class MultiModelEmotionClassifierConfig:
 
@@ -450,4 +568,41 @@ class MultiModelEmotionClassifierConfig:
         :return:
         """
         return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['classifier', ]).compute
+
+    def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+                           save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
+                           save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
+                           per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+        return TrainingArguments(
+            output_dir=save_dir if save_dir is not None else self.default_save_dir(),
+            overwrite_output_dir=True,
+            evaluation_strategy=evaluation_strategy,
+            eval_steps=eval_steps,
+            save_steps=save_steps,
+            logging_steps=logging_steps,
+            do_train=True,
+            do_eval=True,
+            learning_rate=learning_rate,
+            lr_scheduler_type='constant',
+            save_strategy=save_strategy,
+            per_device_train_batch_size=per_device_train_batch_size,
+            per_device_eval_batch_size=per_device_eval_batch_size,
+            num_train_epochs=number_of_epochs,
+
+            # config for load and save best model
+            load_best_model_at_end=load_best_model_at_end,
+            save_total_limit=save_total_limit,
+            metric_for_best_model='loss',
+            greater_is_better=False,
+
+            # hub configs
+            push_to_hub=push_to_hub,
+            hub_model_id=self.hub_args()['hub_model_id'],
+            hub_private_repo=self.hub_args()['hub_private_repo'],
+            hub_token=self.hub_args()['hub_token'],
+            hub_strategy='checkpoint',
+            resume_from_checkpoint='last-checkpoint',
+            save_safetensors=False,
+        )
 

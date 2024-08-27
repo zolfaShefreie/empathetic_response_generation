@@ -140,36 +140,15 @@ class TrainInterface(BaseInterface):
         except Exception as e:
             model = model_class(**config.model_args())
 
-        addition_args = {'predict_with_generate': True} if self.model != 'BiModalEmotionClassifier' else {}
-        trainer_args = Seq2SeqTrainingArguments if self.model != 'BiModalEmotionClassifier' else TrainingArguments(
-            output_dir=self.save_dir if self.save_dir is not None else config.default_save_dir(),
-            overwrite_output_dir=True,
-            evaluation_strategy=self.evaluation_strategy,
-            eval_steps=self.eval_steps,
-            save_steps=self.save_steps,
-            logging_steps=self.logging_steps,
-            do_train=True,
-            do_eval=True,
-            learning_rate=self.learning_rate,
-            lr_scheduler_type='constant',
-            save_strategy=self.save_strategy,
-            per_device_train_batch_size=self.per_device_train_batch_size,
-            per_device_eval_batch_size=self.per_device_eval_batch_size,
-            num_train_epochs=self.number_of_epochs,
-
-            # config for load and save best model
-            load_best_model_at_end=self.load_best_model_at_end,
-            save_total_limit=self.save_total_limit,
-            metric_for_best_model='loss',
-            greater_is_better=False,
-
-            # hub configs
-            push_to_hub=self.push_to_hub,
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
-            save_safetensors=False,
-            **{**addition_args, **config.hub_args()}
-        )
+        trainer_args = config.trainer_args_train(save_dir=self.save_dir, evaluation_strategy=self.evaluation_strategy,
+                                                 eval_steps=self.eval_steps, save_steps=self.save_steps,
+                                                 logging_steps=self.logging_steps, learning_rate=self.learning_rate,
+                                                 save_strategy=self.save_strategy,
+                                                 per_device_train_batch_size=self.per_device_train_batch_size,
+                                                 per_device_eval_batch_size=self.per_device_eval_batch_size,
+                                                 number_of_epochs=self.number_of_epochs,
+                                                 load_best_model_at_end=self.load_best_model_at_end,
+                                                 save_total_limit=self.save_total_limit, push_to_hub=self.push_to_hub)
 
         trainer = config.TrainerClass(
             model=model,
