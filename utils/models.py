@@ -27,7 +27,7 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
         super().__init__(config=config, *inputs, **kwargs)
 
-        self.TASK_CONFIG = self.initial_models(**kwargs)
+        self.TASK_CONFIG = self.initial_models()
         self._validate_task_config()
 
         self.set_shared_layers()
@@ -73,10 +73,9 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
         return "logits"
 
     @abc.abstractmethod
-    def initial_models(self, **kwargs) -> dict:
+    def initial_models(self) -> dict:
         """
         initial models
-        :param kwargs: the arguments that is pasted by __init__ function
         :return: a dictionary that shows task_id and its task (model)
             Example:
             {

@@ -11,6 +11,9 @@ from transformers.models.encoder_decoder.modeling_encoder_decoder import DEPRECA
 import torch.nn.functional as F
 from collections import Counter
 
+from model_data_process.model_configs import KnowledgeEncoderConfig, TextualResponseGeneratorConfig, \
+    EmotionRoberta2DialoGPTConfig, TextAudioIntegratorConfig, MultiModelEmotionClassifierConfig, \
+    MultiModalResponseGeneratorConfig
 from settings import EMPATHY_CLASSIFIER_MODELS_PATH
 from utils.models import MultiTaskModel, BaseMultiTaskOutput, T5EncoderClassifier
 
@@ -124,6 +127,7 @@ class Roberta2GPT2(EncoderDecoderModel, ABC):
 
 
 class ExampleEncoder(PreTrainedModel):
+    config_class = PretrainedConfig
 
     def __init__(self, config=PretrainedConfig(), *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
@@ -206,14 +210,19 @@ class ExampleEncoder(PreTrainedModel):
 
 
 class KnowledgesEncoder(PreTrainedModel):
+    config_class = KnowledgeEncoderConfig
 
-    def __init__(self, kwn_embedding_tokens_len=50266, config: PretrainedConfig = PretrainedConfig(), *args, **kwargs):
+    def __init__(self, config: KnowledgeEncoderConfig = KnowledgeEncoderConfig(), *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
-        print(kwn_embedding_tokens_len, 'kwn_embedding_tokens_len')
+        print(self.config.kwn_embedding_tokens_len, 'kwn_embedding_tokens_len')
         self.encoder = AlbertModel.from_pretrained("albert-base-v2")
-        self.encoder.resize_token_embeddings(kwn_embedding_tokens_len)
-        self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
-        self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dropout=0.2)
+        self.encoder.resize_token_embeddings(self.config.kwn_embedding_tokens_len)
+        self.social_event_attention = torch.nn.MultiheadAttention(embed_dim=768,
+                                                                  num_heads=self.config.social_event_num_heads,
+                                                                  dropout=self.config.social_event_dropout)
+        self.social_entity_attention = torch.nn.MultiheadAttention(embed_dim=768,
+                                                                   num_heads=self.config.social_entity_num_heads,
+                                                                   dropout=self.config.social_entity_dropout)
         self.norm_layer = torch.nn.LayerNorm(768)
 
     def forward(self,
@@ -280,60 +289,28 @@ class KnowledgesEncoder(PreTrainedModel):
 
 
 class TextualResponseGenerator(EncoderDecoderModel, ABC):
+    config_class = TextualResponseGeneratorConfig
 
-    def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
-                 config: PretrainedConfig = None, embedding_tokens_len=50267,
-                 kwn_embedding_tokens_len=50266, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
-                 *inputs, **kwargs):
+    def __init__(self, config: TextualResponseGeneratorConfig, *inputs, **kwargs):
         """
         set encoder and decoder for Roberta-DialoGPT seq2seq model
         :param config:
         :param inputs:
         :param kwargs:
         """
-        config_encoder = AutoConfig.from_pretrained('roberta-base')
-        config_decoder = AutoConfig.from_pretrained('microsoft/DialoGPT-small')
 
-        config_decoder.is_decoder = True
-        config_decoder.add_cross_attention = True
-        config_decoder.max_new_tokens = 64
-        config_decoder.min_length = 2
+        super().__init__(config=config, *inputs, **kwargs)
 
-        encoder = AutoModel.from_config(config=config_encoder)
-        decoder = AutoModelForCausalLM.from_config(config=config_decoder)
-
-        if embedding_tokens_len:
-            encoder.resize_token_embeddings(embedding_tokens_len)
-            decoder.resize_token_embeddings(embedding_tokens_len)
-
-        if config is None:
-            config = EncoderDecoderConfig.from_encoder_decoder_configs(encoder_config=encoder.config,
-                                                                       decoder_config=decoder.config)
-        config.decoder_start_token_id = bos_token_id
-        config.eos_token_id = eos_token_id
-        config.pad_token_id = pad_token_id
-
-        # sensible parameters for beam search
-        # set decoding params
-        config.max_new_tokens = 64
-        config.min_length = 2
-        config.early_stopping = True
-        config.no_repeat_ngram_size = 3
-        config.length_penalty = 2.0
-        config.num_beams = 4
-        config.vocab_size = config.encoder.vocab_size
-        super().__init__(config=config, encoder=encoder, decoder=decoder, *inputs, **kwargs)
-
-        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=kwn_embedding_tokens_len)
+        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=self.config.kwn_embedding_tokens_len)
         self.example_encoders = ExampleEncoder()
         self.norm_layer = torch.nn.LayerNorm(768)
 
         # loss
-        self.empathy_loss_weight = empathy_loss_weight
-        self.main_loss_weight = main_loss_weight
-        self.div_loss_weight = div_loss_weight
+        self.empathy_loss_weight = self.config.empathy_loss_weight
+        self.main_loss_weight = self.config.main_loss_weight
+        self.div_loss_weight = self.config.div_loss_weight
 
-        self.special_token_dict = special_token_dict
+        self.special_token_dict = self.config.special_token_dict
         self.word_freq = torch.zeros(self.config.vocab_size)
         self.criterion = torch.nn.NLLLoss(ignore_index=config.pad_token_id, reduction="sum")
 
@@ -667,29 +644,18 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
 
 
 class EmotionRoberta2DialoGPT(MultiTaskModel):
+    config_class = EmotionRoberta2DialoGPTConfig
 
     def __init__(self,
-                 config: PretrainedConfig = PretrainedConfig(),
+                 config: EmotionRoberta2DialoGPTConfig,
                  *inputs,
                  **kwargs):
-        kwargs['special_token_dict'] = kwargs.get('special_token_dict', None)
-        kwargs['empathy_loss_weight'] = kwargs.get('empathy_loss_weight', 0.1)
-        kwargs['main_loss_weight'] = kwargs.get('main_loss_weight', 1)
-        kwargs['div_loss_weight'] = kwargs.get('div_loss_weight', 1.5)
-        kwargs['bos_token_id'] = kwargs.get('bos_token_id', 0)
-        kwargs['eos_token_id'] = kwargs.get('eos_token_id', 2)
-        kwargs['pad_token_id'] = kwargs.get('pad_token_id', 50266)
-        kwargs['embedding_tokens_len'] = kwargs.get('embedding_tokens_len', 50267)
-        kwargs['kwn_embedding_tokens_len'] = kwargs.get('kwn_embedding_tokens_len', 50266)
-        kwargs['num_labels'] = kwargs.get('num_labels', 32)
-        kwargs['encoder_decoder_config'] = kwargs.get('encoder_decoder_config', None)
         super().__init__(config=config, *inputs, **kwargs)
         self.config.pad_token_id = kwargs.get('pad_token_id', 50266)
 
-    def initial_models(self, **kwargs) -> dict:
+    def initial_models(self) -> dict:
         """
         initial models
-        :param kwargs: the arguments that is pasted by __init__ function
         :return: a dictionary that shows task_id and its task (model)
             Example:
             {
@@ -700,19 +666,19 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
 
             WARNING: if you doesn't put tasks correctly in dict the model doesn't run the task for training and testing
         """
-        self.encoder_decoder = TextualResponseGenerator(bos_token_id=kwargs['bos_token_id'],
-                                                        eos_token_id=kwargs['eos_token_id'],
-                                                        pad_token_id=kwargs['pad_token_id'],
-                                                        config=kwargs['encoder_decoder_config'],
-                                                        embedding_tokens_len=kwargs['embedding_tokens_len'],
-                                                        kwn_embedding_tokens_len=kwargs['kwn_embedding_tokens_len'],
-                                                        div_loss_weight=kwargs['div_loss_weight'],
-                                                        empathy_loss_weight=kwargs['empathy_loss_weight'],
-                                                        main_loss_weight=kwargs['main_loss_weight'],
-                                                        special_token_dict=kwargs['special_token_dict'])
+        encoder_decoder_config = TextualResponseGeneratorConfig(special_token_dict=self.config.special_token_dict,
+                                                                kwn_embedding_tokens_len=self.config.kwn_embedding_tokens_len,
+                                                                bos_token_id=self.config.bos_token_id,
+                                                                eos_token_id=self.config.eos_token_id,
+                                                                pad_token_id=self.config.pad_token_id,
+                                                                embedding_tokens_len=self.config.embedding_tokens_len,
+                                                                div_loss_weight=self.config.div_loss_weight,
+                                                                empathy_loss_weight=self.config.empathy_loss_weight,
+                                                                main_loss_weight=self.config.main_loss_weight)
+        self.encoder_decoder = TextualResponseGenerator(config=encoder_decoder_config)
 
         self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",
-                                                                                     num_labels=kwargs['num_labels'])
+                                                                                     num_labels=self.config.num_labels)
 
         return {
             'response_generator': self.encoder_decoder,
@@ -909,23 +875,24 @@ class TextAudioIntegrator(PreTrainedModel):
     source https://github.com/yuntaeyang/TelME
     """
 
-    def __init__(self, hidden_size=768, beta_shift=1e-1, dropout_prob=0.2, num_head=3,
-                 config=PretrainedConfig(), *args, **kwargs):
+    config_class = TextAudioIntegratorConfig
+
+    def __init__(self, config: TextAudioIntegratorConfig, *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
 
         self.TEXT_DIM = 768
         self.ACOUSTIC_DIM = 768
-        self.multihead_attn = torch.nn.MultiheadAttention(self.ACOUSTIC_DIM, num_head)
+        self.multihead_attn = torch.nn.MultiheadAttention(self.ACOUSTIC_DIM, self.config.num_head_integrator)
 
         self.W_hav = torch.nn.Linear(self.ACOUSTIC_DIM + self.TEXT_DIM, self.TEXT_DIM)
 
         self.W_av = torch.nn.Linear(self.ACOUSTIC_DIM, self.TEXT_DIM)
 
-        self.beta_shift = beta_shift
+        self.beta_shift = self.config.beta_shift_integrator
 
-        self.LayerNorm = torch.nn.LayerNorm(hidden_size)
+        self.LayerNorm = torch.nn.LayerNorm(self.config.hidden_size_integrator)
         self.AV_LayerNorm = torch.nn.LayerNorm(self.ACOUSTIC_DIM)
-        self.dropout = torch.nn.Dropout(dropout_prob)
+        self.dropout = torch.nn.Dropout(self.config.dropout_prob_integrator)
 
     def forward(self, text_embedding=None, acoustic_embedding=None):
         """
@@ -974,18 +941,19 @@ class TextAudioIntegrator(PreTrainedModel):
 
 
 class MultiModelEmotionClassifier(PreTrainedModel):
+    config_class = MultiModelEmotionClassifierConfig
 
-    def __init__(self, num_classes: int, embedding_tokens_len=50267, config=PretrainedConfig(), *args, **kwargs):
+    def __init__(self, config: MultiModelEmotionClassifierConfig, *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
-        self.num_classes = num_classes
+        self.num_classes = self.config.num_classes
         self.roberta = RobertaModel.from_pretrained('roberta-base')
-        self.roberta.resize_token_embeddings(embedding_tokens_len)
+        self.roberta.resize_token_embeddings(self.config.embedding_tokens_len)
 
         self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
 
-        self.text_audio_integrator = TextAudioIntegrator()
+        self.text_audio_integrator = TextAudioIntegrator(config=config)
 
-        self.W = torch.nn.Linear(768, num_classes)
+        self.W = torch.nn.Linear(768, self.config.num_classes)
 
     def forward(self, input_ids=None, attention_mask=None, audio_input_values=None, audio_attention_mask=None,
                 return_dict=True, labels=None, *args, **kwargs):
@@ -1023,10 +991,9 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
 
 class MultiModalResponseGenerator(TextualResponseGenerator, ABC):
+    config_class = MultiModalResponseGeneratorConfig
 
-    def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
-                 config: PretrainedConfig = None, embedding_tokens_len=50267,
-                 kwn_embedding_tokens_len=50266, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
+    def __init__(self, config: MultiModalResponseGeneratorConfig,
                  *inputs, **kwargs):
         """
         set encoder and decoder for Roberta-DialoGPT seq2seq model
@@ -1034,14 +1001,10 @@ class MultiModalResponseGenerator(TextualResponseGenerator, ABC):
         :param inputs:
         :param kwargs:
         """
-        super().__init__(special_token_dict=special_token_dict, empathy_loss_weight=empathy_loss_weight,
-                         main_loss_weight=main_loss_weight, div_loss_weight=div_loss_weight, config=config,
-                         bos_token_id=bos_token_id, eos_token_id=eos_token_id,
-                         pad_token_id=pad_token_id, embedding_tokens_len=embedding_tokens_len,
-                         kwn_embedding_tokens_len=kwn_embedding_tokens_len, *inputs, **kwargs)
+        super().__init__(config=config, *inputs, **kwargs)
 
         self.data2vec_audio = Data2VecAudioModel.from_pretrained("facebook/data2vec-audio-base-960h")
-        self.text_audio_integrator = TextAudioIntegrator()
+        self.text_audio_integrator = TextAudioIntegrator(config=config)
 
     def forward(self,
                 audio_input_values=None,
