@@ -288,7 +288,7 @@ class KnowledgesEncoder(PreTrainedModel):
                                                       encoded_react_knw]), dim=0))
 
 
-class TextualResponseGenerator(EncoderDecoderModel, ABC):
+class TextualResponseGenerator(EncoderDecoderModel):
     config_class = TextualResponseGeneratorConfig
 
     def __init__(self, config: TextualResponseGeneratorConfig, *inputs, **kwargs):
@@ -650,7 +650,6 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                  *inputs,
                  **kwargs):
         super().__init__(config=config, *inputs, **kwargs)
-        self.config.pad_token_id = kwargs.get('pad_token_id', 50266)
 
     def initial_models(self) -> dict:
         """
@@ -989,7 +988,7 @@ class MultiModelEmotionClassifier(PreTrainedModel):
             return ((loss,) + output) if loss is not None else output
 
 
-class MultiModalResponseGenerator(TextualResponseGenerator, ABC):
+class MultiModalResponseGenerator(TextualResponseGenerator):
     config_class = MultiModalResponseGeneratorConfig
 
     def __init__(self, config: MultiModalResponseGeneratorConfig,

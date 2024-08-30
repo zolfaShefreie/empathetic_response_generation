@@ -42,6 +42,7 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
         self.length_penalty = 2.0
         self.num_beams = 4
         self.vocab_size = self.encoder.vocab_size
+        self.is_encoder_decoder = True
 
     def initial_encoder_decoder(self, embedding_tokens_len):
         result = dict()
@@ -103,3 +104,4 @@ class MultiModalResponseGeneratorConfig(TextualResponseGeneratorConfig, TextAudi
         TextualResponseGeneratorConfig.__init__(self, **kwargs)
         TextAudioIntegratorConfig.__init__(self, **kwargs)
         self.decoder_start_token_id = self.bos_token_id
+        self.is_encoder_decoder = True
