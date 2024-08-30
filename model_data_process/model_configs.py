@@ -4,7 +4,7 @@ from transformers import PretrainedConfig, AutoConfig, AutoModel, AutoModelForCa
 class KnowledgeEncoderConfig(PretrainedConfig):
     model_type = "knowledge_encoder"
 
-    def __init__(self, kwn_embedding_tokens_len=50266, social_event_num_heads=8, social_event_dropout=0.2,
+    def __init__(self, kwn_embedding_tokens_len=30016, social_event_num_heads=8, social_event_dropout=0.2,
                  social_entity_num_heads=8, social_entity_dropout=0.2, **kwargs):
         super().__init__(**kwargs)
         self.kwn_embedding_tokens_len = kwn_embedding_tokens_len
@@ -20,9 +20,10 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
     def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  embedding_tokens_len=50267, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
                  ** kwargs):
-
-        super(EncoderDecoderConfig, self).__init__(**self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len))
-        super(KnowledgeEncoderConfig, self).__init__(**kwargs)
+        encoder_decoder_args = self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len)
+        EncoderDecoderConfig.__init__(self, **encoder_decoder_args)
+        KnowledgeEncoderConfig.__init__(self, **kwargs)
+        self.decoder_start_token_id = bos_token_id
         self.special_token_dict = special_token_dict
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
@@ -99,5 +100,6 @@ class MultiModelEmotionClassifierConfig(TextAudioIntegratorConfig):
 class MultiModalResponseGeneratorConfig(TextualResponseGeneratorConfig, TextAudioIntegratorConfig):
 
     def __init__(self, **kwargs):
-        super(TextualResponseGeneratorConfig, self).__init__(**kwargs)
-        super(TextAudioIntegratorConfig, self).__init__(**kwargs)
+        TextualResponseGeneratorConfig.__init__(self, **kwargs)
+        TextAudioIntegratorConfig.__init__(self, **kwargs)
+        self.decoder_start_token_id = self.bos_token_id

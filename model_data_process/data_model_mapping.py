@@ -113,7 +113,8 @@ class MultiModalResponseGeneratorMapping:
             kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
-            empathy_loss_weight=empathy_loss_weight)
+            empathy_loss_weight=empathy_loss_weight,
+            hidden_size_integrator=768)
         return {'config': config}
 
     @staticmethod

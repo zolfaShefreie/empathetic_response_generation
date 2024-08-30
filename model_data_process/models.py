@@ -300,8 +300,7 @@ class TextualResponseGenerator(EncoderDecoderModel, ABC):
         """
 
         super().__init__(config=config, *inputs, **kwargs)
-
-        self.knowledge_encoder = KnowledgesEncoder(kwn_embedding_tokens_len=self.config.kwn_embedding_tokens_len)
+        self.knowledge_encoder = KnowledgesEncoder(config=config)
         self.example_encoders = ExampleEncoder()
         self.norm_layer = torch.nn.LayerNorm(768)
 
