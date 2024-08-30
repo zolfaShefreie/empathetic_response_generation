@@ -1,6 +1,6 @@
 from utils.interface import BaseInterface
-from model_data_process.data_model_mapping import MultiModalResponseGeneratorConfig, TextualResponseGeneratorConfig,\
-    EmotionalTextualResponseGeneratorConfig, MultiModelEmotionClassifierConfig
+from model_data_process.data_model_mapping import MultiModalResponseGeneratorMapping, TextualResponseGeneratorMapping,\
+    EmotionalTextualResponseGeneratorMapping, MultiModelEmotionClassifierMapping
 from utils.callbacks import SaveHistoryCallback
 
 from transformers import DefaultFlowCallback, EarlyStoppingCallback
@@ -12,10 +12,10 @@ class EvaluateInterface(BaseInterface):
     DESCRIPTION = "You can run the evaluation process using this interface"
 
     MAP_CONFIGS = {
-        'BiModalResponseGenerator': MultiModalResponseGeneratorConfig,
-        'BiModalEmotionClassifier': MultiModelEmotionClassifierConfig,
-        'EmotionalTextualResponseGenerator': EmotionalTextualResponseGeneratorConfig,
-        'TextualResponseGenerator': TextualResponseGeneratorConfig
+        'BiModalResponseGenerator': MultiModalResponseGeneratorMapping,
+        'BiModalEmotionClassifier': MultiModelEmotionClassifierMapping,
+        'EmotionalTextualResponseGenerator': EmotionalTextualResponseGeneratorMapping,
+        'TextualResponseGenerator': TextualResponseGeneratorMapping
     }
 
     ARGUMENTS = {

@@ -1,3 +1,5 @@
+from model_data_process.model_configs import EmotionRoberta2DialoGPTConfig, MultiModalResponseGeneratorConfig, \
+    MultiModelEmotionClassifierConfig, TextualResponseGeneratorConfig
 from model_data_process.models import MultiModalResponseGenerator, TextualResponseGenerator, EmotionRoberta2DialoGPT, \
     MultiModelEmotionClassifier
 from model_data_process.dataset import BiMEmpDialoguesDataset, EmpatheticDialoguesDataset, MELDDataset
@@ -14,7 +16,7 @@ from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor
     TrainingArguments
 
 
-class MultiModalResponseGeneratorConfig:
+class MultiModalResponseGeneratorMapping:
 
     def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
@@ -101,16 +103,18 @@ class MultiModalResponseGeneratorConfig:
         get model new object args
         :return:
         """
-        return {'embedding_tokens_len': len(self.CONVERSATION_TOKENIZER.tokenizer),
-                'special_token_dict': {each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                       for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-                'bos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-                'eos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-                'pad_token_id': self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
-                'kwn_embedding_tokens_len': len(self.KNOWLEDGE_TOKENIZER.tokenizer),
-                'div_loss_weight': div_loss_weight,
-                'main_loss_weight': main_loss_weight,
-                'empathy_loss_weight': empathy_loss_weight}
+        config = MultiModalResponseGeneratorConfig(
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
+            div_loss_weight=div_loss_weight,
+            main_loss_weight=main_loss_weight,
+            empathy_loss_weight=empathy_loss_weight)
+        return {'config': config}
 
     @staticmethod
     def hub_args():
@@ -206,7 +210,7 @@ class MultiModalResponseGeneratorConfig:
         )
 
 
-class TextualResponseGeneratorConfig:
+class TextualResponseGeneratorMapping:
 
     def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
@@ -288,16 +292,20 @@ class TextualResponseGeneratorConfig:
         get model new object args
         :return:
         """
-        return {'embedding_tokens_len': len(self.CONVERSATION_TOKENIZER.tokenizer),
-                'special_token_dict': {each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                       for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-                'bos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-                'eos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-                'pad_token_id': self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
-                'kwn_embedding_tokens_len': len(self.KNOWLEDGE_TOKENIZER.tokenizer),
-                'div_loss_weight': div_loss_weight,
-                'main_loss_weight': main_loss_weight,
-                'empathy_loss_weight': empathy_loss_weight}
+        config = TextualResponseGeneratorConfig(
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
+            div_loss_weight=div_loss_weight,
+            main_loss_weight=main_loss_weight,
+            empathy_loss_weight=empathy_loss_weight,
+            )
+
+        return {'config': config}
 
     @staticmethod
     def hub_args():
@@ -393,7 +401,7 @@ class TextualResponseGeneratorConfig:
         )
 
 
-class EmotionalTextualResponseGeneratorConfig:
+class EmotionalTextualResponseGeneratorMapping:
 
     def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
         """
@@ -476,17 +484,19 @@ class EmotionalTextualResponseGeneratorConfig:
         :param empathy_loss_weight:
         :return:
         """
-        return {'embedding_tokens_len': len(self.CONVERSATION_TOKENIZER.tokenizer),
-                'special_token_dict': {each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                       for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-                'bos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-                'eos_token_id': self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-                'pad_token_id': self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
-                'num_labels': 32,
-                'kwn_embedding_tokens_len': len(self.KNOWLEDGE_TOKENIZER.tokenizer),
-                'div_loss_weight': div_loss_weight,
-                'main_loss_weight': main_loss_weight,
-                'empathy_loss_weight': empathy_loss_weight}
+        config = EmotionRoberta2DialoGPTConfig(
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            num_labels=32,
+            kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
+            div_loss_weight=div_loss_weight,
+            main_loss_weight=main_loss_weight,
+            empathy_loss_weight=empathy_loss_weight)
+        return {'config': config}
 
     @staticmethod
     def hub_args():
@@ -583,7 +593,7 @@ class EmotionalTextualResponseGeneratorConfig:
         )
 
 
-class MultiModelEmotionClassifierConfig:
+class MultiModelEmotionClassifierMapping:
 
     def __init__(self, source_max_len: int = 300, *args, **kwargs):
 
@@ -633,7 +643,9 @@ class MultiModelEmotionClassifierConfig:
         get model new object args
         :return:
         """
-        return {'num_classes': 7, 'embedding_tokens_len': len(self.CONVERSATION_TOKENIZER.tokenizer)}
+        config = MultiModelEmotionClassifierConfig(text_audio_emo_num_classes=7,
+                                                   embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer))
+        return {'config': config}
 
     @staticmethod
     def hub_args():
@@ -724,5 +736,3 @@ class MultiModelEmotionClassifierConfig:
             resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
-
-
