@@ -3,12 +3,12 @@ from model_data_process.data_model_mapping import MultiModalResponseGeneratorCon
     EmotionalTextualResponseGeneratorConfig, MultiModelEmotionClassifierConfig
 from utils.callbacks import SaveHistoryCallback
 
-from transformers import Seq2SeqTrainingArguments, DefaultFlowCallback, EarlyStoppingCallback, TrainingArguments
+from transformers import DefaultFlowCallback, EarlyStoppingCallback
 from transformers.trainer_utils import PredictionOutput
 import os
 
 
-class TrainInterface(BaseInterface):
+class EvaluateInterface(BaseInterface):
     DESCRIPTION = "You can run the evaluation process using this interface"
 
     MAP_CONFIGS = {
@@ -102,27 +102,12 @@ class TrainInterface(BaseInterface):
 
         model.eval()
 
-        addition_args = {'predict_with_generate': True} if self.model != 'BiModalEmotionClassifier' else {}
-        trainer_args = Seq2SeqTrainingArguments if self.model != 'BiModalEmotionClassifier' else TrainingArguments(
-            output_dir=self.save_dir if self.save_dir is not None else config.default_save_dir(),
-            overwrite_output_dir=True,
-            evaluation_strategy=self.evaluation_strategy,
-            logging_steps=self.logging_steps,
-            per_device_eval_batch_size=self.per_device_eval_batch_size,
-
-            # config for load and save best model
-            load_best_model_at_end=self.load_best_model_at_end,
-            metric_for_best_model='loss',
-            greater_is_better=False,
-
-            # hub configs
-            push_to_hub=self.push_to_hub,
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
-            save_safetensors=False,
-            **{**addition_args, **config.hub_args()}
-        )
-
+        trainer_args = config.trainer_args_evaluate(save_dir=self.save_dir,
+                                                    evaluation_strategy=self.evaluation_strategy,
+                                                    logging_steps=self.logging_steps,
+                                                    per_device_eval_batch_size=self.per_device_eval_batch_size,
+                                                    load_best_model_at_end=self.load_best_model_at_end,
+                                                    push_to_hub=self.push_to_hub)
         trainer = config.TrainerClass(
             model=model,
             args=trainer_args,
@@ -136,4 +121,4 @@ class TrainInterface(BaseInterface):
 
 
 if __name__ == "__main__":
-    TrainInterface().run()
+    EvaluateInterface().run()
