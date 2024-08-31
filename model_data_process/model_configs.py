@@ -80,7 +80,7 @@ class EmotionRoberta2DialoGPTConfig(TextualResponseGeneratorConfig):
 class TextAudioIntegratorConfig(PretrainedConfig):
     model_type = 'text_audio_integrator'
 
-    def __init__(self, hidden_size_integrator=32, beta_shift_integrator=1e-1, dropout_prob_integrator=0.2,
+    def __init__(self, hidden_size_integrator=768, beta_shift_integrator=1e-1, dropout_prob_integrator=0.2,
                  num_head_integrator=3, **kwargs):
         super().__init__(**kwargs)
         self.hidden_size_integrator = hidden_size_integrator
@@ -92,7 +92,7 @@ class TextAudioIntegratorConfig(PretrainedConfig):
 class MultiModelEmotionClassifierConfig(TextAudioIntegratorConfig):
     model_type = "text_audio_emo_classifier"
 
-    def __init__(self, text_audio_emo_num_classes, embedding_tokens_len=50267, **kwargs):
+    def __init__(self, text_audio_emo_num_classes=7, embedding_tokens_len=50267, **kwargs):
         super().__init__(**kwargs)
         self.text_audio_emo_num_classes = text_audio_emo_num_classes
         self.embedding_tokens_len = embedding_tokens_len

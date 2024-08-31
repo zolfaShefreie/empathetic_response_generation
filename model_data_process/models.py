@@ -943,7 +943,7 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
     def __init__(self, config: MultiModelEmotionClassifierConfig, *args, **kwargs):
         super().__init__(config=config, *args, **kwargs)
-        self.num_classes = self.config.num_classes
+        self.num_classes = self.config.text_audio_emo_num_classes
         self.roberta = RobertaModel.from_pretrained('roberta-base')
         self.roberta.resize_token_embeddings(self.config.embedding_tokens_len)
 
@@ -951,7 +951,7 @@ class MultiModelEmotionClassifier(PreTrainedModel):
 
         self.text_audio_integrator = TextAudioIntegrator(config=config)
 
-        self.W = torch.nn.Linear(768, self.config.num_classes)
+        self.W = torch.nn.Linear(768, self.config.text_audio_emo_num_classes)
 
     def forward(self, input_ids=None, attention_mask=None, audio_input_values=None, audio_attention_mask=None,
                 return_dict=True, labels=None, *args, **kwargs):
