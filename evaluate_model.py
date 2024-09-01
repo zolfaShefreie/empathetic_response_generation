@@ -48,21 +48,18 @@ class EvaluateInterface(BaseInterface):
         },
     }
 
-    def save_result(self, prediction_output: PredictionOutput, default_path: str):
+    def save_result(self, prediction_output: PredictionOutput, config, default_path: str):
         """
         save result of predict model
         :param prediction_output:
-        :param tokenizer:
+        :param config:
         :param default_path:
         :return:
         """
-        data = {
-            'predictions': prediction_output.predictions,
-            'labels': prediction_output.label_ids,
-            'metrics': prediction_output.metrics
-        }
+        data = config.post_result(prediction_output)
+
         output_file_path = f"{self.save_dir if self.save_dir is not None else default_path}/result"
-        
+
         if not os.path.exists(os.path.dirname(output_file_path)):
             try:
                 os.makedirs(os.path.dirname(output_file_path))
