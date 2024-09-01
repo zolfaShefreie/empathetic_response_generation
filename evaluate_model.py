@@ -31,18 +31,6 @@ class EvaluateInterface(BaseInterface):
             'required': False,
             'default': None
         },
-        'evaluation_strategy': {
-            'help': ' The evaluation strategy to adopt during training.',
-            'choices': ['steps', 'epoch', 'no'],
-            'required': False,
-            'default': 'epoch'
-        },
-        'eval_steps': {
-            'help': 'Number of update steps between two evaluations if evaluation_strategy="steps"',
-            'type': int,
-            'required': False,
-            'default': 4
-        },
 
         'logging_steps': {
             'help': ' Number of update steps between two logs if logging_strategy="steps". '
@@ -50,13 +38,6 @@ class EvaluateInterface(BaseInterface):
             'type': int,
             'required': False,
             'default': 4
-        },
-
-        'load_best_model_at_end': {
-            'help': 'Whether or not to load the best model found during training at the end of training.',
-            'type': bool,
-            'required': False,
-            'default': True
         },
 
         'per_device_eval_batch_size': {
@@ -103,10 +84,8 @@ class EvaluateInterface(BaseInterface):
         model.eval()
 
         trainer_args = config.trainer_args_evaluate(save_dir=self.save_dir,
-                                                    evaluation_strategy=self.evaluation_strategy,
                                                     logging_steps=self.logging_steps,
                                                     per_device_eval_batch_size=self.per_device_eval_batch_size,
-                                                    load_best_model_at_end=self.load_best_model_at_end,
                                                     push_to_hub=self.push_to_hub)
         trainer = config.TrainerClass(
             model=model,

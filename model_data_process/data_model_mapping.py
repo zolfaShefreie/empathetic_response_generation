@@ -180,25 +180,18 @@ class MultiModalResponseGeneratorMapping:
             save_safetensors=False,
         )
 
-    def trainer_args_evaluate(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+    def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              load_best_model_at_end: bool = True, push_to_hub: bool = True):
+                              push_to_hub: bool = True):
 
         return Seq2SeqTrainingArguments(
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
-            evaluation_strategy=evaluation_strategy,
-            eval_steps=eval_steps,
             logging_steps=logging_steps,
             do_eval=True,
             per_device_eval_batch_size=per_device_eval_batch_size,
-
-            # config for load and save best model
-            load_best_model_at_end=load_best_model_at_end,
-            metric_for_best_model='loss',
-            greater_is_better=False,
 
             # hub configs
             push_to_hub=push_to_hub,
@@ -371,25 +364,18 @@ class TextualResponseGeneratorMapping:
             save_safetensors=False,
         )
 
-    def trainer_args_evaluate(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+    def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              load_best_model_at_end: bool = True, push_to_hub: bool = True):
+                              push_to_hub: bool = True):
 
         return Seq2SeqTrainingArguments(
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
-            evaluation_strategy=evaluation_strategy,
-            eval_steps=eval_steps,
             logging_steps=logging_steps,
             do_eval=True,
             per_device_eval_batch_size=per_device_eval_batch_size,
-
-            # config for load and save best model
-            load_best_model_at_end=load_best_model_at_end,
-            metric_for_best_model='loss',
-            greater_is_better=False,
 
             # hub configs
             push_to_hub=push_to_hub,
@@ -566,22 +552,15 @@ class EmotionalTextualResponseGeneratorMapping:
     def trainer_args_evaluate(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              load_best_model_at_end: bool = True, push_to_hub: bool = True):
+                              push_to_hub: bool = True):
 
         return Seq2SeqTrainingArguments(
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
-            evaluation_strategy=evaluation_strategy,
-            eval_steps=eval_steps,
             logging_steps=logging_steps,
             do_eval=True,
             per_device_eval_batch_size=per_device_eval_batch_size,
-
-            # config for load and save best model
-            load_best_model_at_end=load_best_model_at_end,
-            metric_for_best_model='loss',
-            greater_is_better=False,
 
             # hub configs
             push_to_hub=push_to_hub,
@@ -709,24 +688,17 @@ class MultiModelEmotionClassifierMapping:
             save_safetensors=False,
         )
 
-    def trainer_args_evaluate(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+    def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              load_best_model_at_end: bool = True, push_to_hub: bool = True):
+                              push_to_hub: bool = True):
 
         return TrainingArguments(
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
-            evaluation_strategy=evaluation_strategy,
-            eval_steps=eval_steps,
             logging_steps=logging_steps,
             do_eval=True,
             per_device_eval_batch_size=per_device_eval_batch_size,
-
-            # config for load and save best model
-            load_best_model_at_end=load_best_model_at_end,
-            metric_for_best_model='loss',
-            greater_is_better=False,
 
             # hub configs
             push_to_hub=push_to_hub,

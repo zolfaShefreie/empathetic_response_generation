@@ -9,6 +9,7 @@ from transformers.integrations import is_deepspeed_zero3_enabled
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.trainer_pt_utils import nested_detach, nested_concat
+from transformers.trainer_utils import PredictionOutput
 from transformers.utils.import_utils import is_peft_available
 from transformers.utils import is_sagemaker_mp_enabled, is_torch_tpu_available
 if is_torch_tpu_available(check_device=False):
@@ -341,6 +342,17 @@ class TrainerMultiLoss(Trainer):
 
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
+
+    def predict(
+        self, test_dataset: Dataset, ignore_keys: Optional[List[str]] = None, metric_key_prefix: str = "test"
+    ) -> PredictionOutput:
+        predicts = super().predict(test_dataset=test_dataset, ignore_keys=ignore_keys,
+                                   metric_key_prefix=metric_key_prefix)
+        metrics = predicts.metrics
+        total_eval_other_loss = self._calculate_eval_other_losses()
+        metrics.update(total_eval_other_loss)
+        self._reset_other_losses(is_eval=True)
+        return PredictionOutput(predictions=predicts.predictions, label_ids=predicts.label_ids, metrics=metrics)
 
 
 class Seq2SeqTrainerMultiLoss(Seq2SeqTrainer, TrainerMultiLoss):

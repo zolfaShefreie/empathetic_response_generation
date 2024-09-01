@@ -21,8 +21,8 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
                  embedding_tokens_len=50267, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
                  ** kwargs):
         encoder_decoder_args = self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len)
-        EncoderDecoderConfig.__init__(self, **encoder_decoder_args)
         KnowledgeEncoderConfig.__init__(self, **kwargs)
+        EncoderDecoderConfig.__init__(self, **encoder_decoder_args)
         self.decoder_start_token_id = bos_token_id
         self.special_token_dict = special_token_dict
         self.bos_token_id = bos_token_id
@@ -101,7 +101,7 @@ class MultiModelEmotionClassifierConfig(TextAudioIntegratorConfig):
 class MultiModalResponseGeneratorConfig(TextualResponseGeneratorConfig, TextAudioIntegratorConfig):
 
     def __init__(self, **kwargs):
-        TextualResponseGeneratorConfig.__init__(self, **kwargs)
         TextAudioIntegratorConfig.__init__(self, **kwargs)
+        TextualResponseGeneratorConfig.__init__(self, **kwargs)
         self.decoder_start_token_id = self.bos_token_id
         self.is_encoder_decoder = True
