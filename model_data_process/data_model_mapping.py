@@ -1,3 +1,5 @@
+from transformers.trainer_utils import PredictionOutput
+
 from model_data_process.model_configs import EmotionRoberta2DialoGPTConfig, MultiModalResponseGeneratorConfig, \
     MultiModelEmotionClassifierConfig, TextualResponseGeneratorConfig
 from model_data_process.models import MultiModalResponseGenerator, TextualResponseGenerator, EmotionRoberta2DialoGPT, \
@@ -5,7 +7,7 @@ from model_data_process.models import MultiModalResponseGenerator, TextualRespon
 from model_data_process.dataset import BiMEmpDialoguesDataset, EmpatheticDialoguesDataset, MELDDataset
 from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTokenizer, TextCleaner, ToTensor, \
     ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion, \
-    ExampleTokenizer, AudioFeatureExtractor
+    ExampleTokenizer, AudioFeatureExtractor, PostProcessResult
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_ACCESS_TOKEN, MELD_DATASET_PATH, \
     HUB_BIMODEL_ID, HUB_BIMODEL_PRIVATE_REPO, BMEDIALOGUES_PATH, HUB_EMO_TEXT_MODEL_ID, HUB_EMO_TEXT_PRIVATE_REPO, \
     HUB_CLASSIFIER_MODEL_ID, HUB_CLASSIFIER_PRIVATE_REPO, HUB_TEXT_MODEL_ID, HUB_TEXT_PRIVATE_REPO
@@ -13,7 +15,7 @@ from utils.metrics import Metrics
 from utils.trainer import Seq2SeqTrainerMultiLoss, MultiTaskTrainer
 
 from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor, Trainer, Seq2SeqTrainingArguments, \
-    TrainingArguments
+    TrainingArguments, EvalPrediction
 
 
 class MultiModalResponseGeneratorMapping:
@@ -90,6 +92,9 @@ class MultiModalResponseGeneratorMapping:
                                [f"example_{i}_{suffix}" for i in range(0, 5)
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
+
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+                                              task_list=['text_generator', ])
 
     def dataset_args(self, split: str = 'train'):
         """
@@ -203,6 +208,11 @@ class MultiModalResponseGeneratorMapping:
             save_safetensors=False,
         )
 
+    def post_result(self, pred: PredictionOutput):
+        result = self.post_process.compute(pred)
+        result.update({'metric': pred.metrics})
+        return result
+
 
 class TextualResponseGeneratorMapping:
 
@@ -273,6 +283,9 @@ class TextualResponseGeneratorMapping:
                                [f"example_{i}_{suffix}" for i in range(0, 5)
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
+
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+                                              task_list=['text_generator', ])
 
     def dataset_args(self, split: str = 'train'):
         """
@@ -387,6 +400,11 @@ class TextualResponseGeneratorMapping:
             save_safetensors=False,
         )
 
+    def post_result(self, pred: PredictionOutput):
+        result = self.post_process.compute(pred)
+        result.update({'metric': pred.metrics})
+        return result
+
 
 class EmotionalTextualResponseGeneratorMapping:
 
@@ -457,6 +475,9 @@ class EmotionalTextualResponseGeneratorMapping:
                                [f"example_{i}_{suffix}" for i in range(0, 5)
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
+
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+                                              task_list=['text_generator', 'classifier'])
 
     def dataset_args(self, split: str = 'train'):
         """
@@ -549,7 +570,7 @@ class EmotionalTextualResponseGeneratorMapping:
             save_safetensors=False,
         )
 
-    def trainer_args_evaluate(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+    def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
                               push_to_hub: bool = True):
@@ -571,6 +592,11 @@ class EmotionalTextualResponseGeneratorMapping:
             resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
+
+    def post_result(self, pred: PredictionOutput):
+        result = self.post_process.compute(pred)
+        result.update({'metric': pred.metrics})
+        return result
 
 
 class MultiModelEmotionClassifierMapping:
@@ -610,6 +636,9 @@ class MultiModelEmotionClassifierMapping:
             ToTensor(),
             ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'audio_attention_mask']),
         ])
+
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+                                              task_list=['classifier', ])
 
     def dataset_args(self, split: str = 'train'):
         """
@@ -709,3 +738,8 @@ class MultiModelEmotionClassifierMapping:
             resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
+
+    def post_result(self, pred: PredictionOutput):
+        result = self.post_process.compute(pred)
+        result.update({'metric': pred.metrics})
+        return result

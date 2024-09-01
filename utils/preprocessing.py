@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+from transformers import EvalPrediction
+from transformers.trainer_utils import PredictionOutput
 
 
 class NewVersionDialogues:
@@ -736,3 +738,44 @@ class AudioFeatureExtractor:
 
         sample.update({f"{self.result_prefix_key_name}_{k}": v[0] for k, v in result.items()})
         return sample
+
+
+class PostProcessResult:
+
+    def __init__(self, task_list: list, tokenizer=None):
+        self.tokenizer = tokenizer
+        self._validate_task_list(task_list=task_list)
+        self.task_list = task_list
+
+    def _validate_task_list(self, task_list: list):
+        for task in task_list:
+            if getattr(self, f'{task}_result', None) is None:
+                raise Exception(f"{task} doesn't exist")
+
+    @classmethod
+    def classifier_result(cls, pred, labels):
+        result = 1 / (1 + np.exp(-pred))
+        return np.argmax(result, axis=-1), labels
+
+    def text_generator_result(self, pred, labels):
+        pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
+        labels[labels == -100] = self.tokenizer.pad_token_id
+        label_str = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+        return {'pred': pred_str, 'labels': label_str}
+
+    def compute(self, pred: PredictionOutput) -> dict:
+        result = dict()
+
+        if len(self.task_list) == 1:
+            func_task = getattr(self, f"{self.task_list[0]}_result", None)
+            if func_task is not None:
+                result.update({f'{self.task_list[0]}_result': func_task(pred=pred.predictions, labels=pred.label_ids)})
+
+        else:
+            for i, task_name in enumerate(self.task_list):
+                pred_task, labels_task = pred.predictions[i], pred.label_ids[i]
+                func_task = getattr(self, f"{task_name}_result", None)
+                if func_task is not None:
+                    result.update({f"{task_name}_result": func_task(pred=pred_task, labels=labels_task)})
+
+        return result
