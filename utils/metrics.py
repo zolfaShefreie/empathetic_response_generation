@@ -94,8 +94,9 @@ class Metrics:
 
         # convert ids to token ids version
         pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
-        labels[labels == -100] = self.tokenizer.pad_token_id
-        label_str = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+        copy_labels = np.copy(labels)
+        copy_labels[copy_labels == -100] = self.tokenizer.pad_token_id
+        label_str = self.tokenizer.batch_decode(copy_labels, skip_special_tokens=True)
         pred_str = ['.' if not each else each for each in pred_str]
 
         # metrics using token version
