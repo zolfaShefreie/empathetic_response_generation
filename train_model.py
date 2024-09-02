@@ -139,6 +139,8 @@ class TrainInterface(BaseInterface):
             model = model_class.from_pretrained(config.hub_args()['hub_model_id'], token=config.hub_args()['hub_token'])
         except Exception as e:
             model = model_class(**config.model_args())
+            if getattr(config, 'initial_weights_from_other_models', None) is not None:
+                model.load_state_dict(config.initial_weights_from_other_models(), strict=False)
 
         trainer_args = config.trainer_args_train(save_dir=self.save_dir, evaluation_strategy=self.evaluation_strategy,
                                                  eval_steps=self.eval_steps, save_steps=self.save_steps,

@@ -213,6 +213,37 @@ class MultiModalResponseGeneratorMapping:
         result.update({'metric': pred.metrics})
         return result
 
+    def initial_weights_from_other_models(self):
+        weight_states = dict()
+        mapping_keys = {EmotionalTextualResponseGeneratorMapping(): ['encoder', 'knowledge_encoder', 'example_encoders',
+                                                                     'norm_layer', 'decoder'],
+                        MultiModelEmotionClassifierMapping(): ['data2vec_audio', 'text_audio_integrator']}
+
+        for mapping, key_of_layers in mapping_keys.items():
+
+            try:
+                model = mapping.ModelClass.from_pretrained(mapping.hub_args()['hub_model_id'],
+                                                           token=mapping.hub_args()['hub_token'])
+            except Exception as e1:
+                print(f'exception from load model: {mapping.ModelClass.__name__}')
+                print(e1)
+                try:
+
+                    model = mapping.ModelClass.from_pretrained(mapping.default_save_dir())
+                except Exception as e2:
+                    print(f'exception from load model: {mapping.ModelClass.__name__}')
+                    print(e2)
+                    raise Exception("can't load pretrained models")
+
+            if isinstance(model, EmotionRoberta2DialoGPT):
+                model = model.encoder_decoder
+
+            weight_states.update({k: model.state_dict()[k]
+                                  for k in model.state_dict()
+                                  for key_layer in key_of_layers if k.startswith(f"{key_layer}.")})
+
+        return weight_states
+
 
 class TextualResponseGeneratorMapping:
 
@@ -404,6 +435,35 @@ class TextualResponseGeneratorMapping:
         result = self.post_process.compute(pred)
         result.update({'metric': pred.metrics})
         return result
+
+    def initial_weights_from_other_models(self):
+        weight_states = dict()
+        mapping = EmotionalTextualResponseGeneratorMapping()
+        key_of_layers = ['encoder', 'knowledge_encoder', 'example_encoders', 'norm_layer', 'decoder']
+
+
+        try:
+            model = mapping.ModelClass.from_pretrained(mapping.hub_args()['hub_model_id'],
+                                                           token=mapping.hub_args()['hub_token'])
+        except Exception as e1:
+            print(f'exception from load model: {mapping.ModelClass.__name__}')
+            print(e1)
+            try:
+
+                model = mapping.ModelClass.from_pretrained(mapping.default_save_dir())
+            except Exception as e2:
+                print(f'exception from load model: {mapping.ModelClass.__name__}')
+                print(e2)
+                raise Exception("can't load pretrained models")
+
+        if model is None:
+            return {}
+
+        weight_states.update({k: model.encoder_decoder.state_dict()[k]
+                              for k in model.encoder_decoder.state_dict()
+                              for key_layer in key_of_layers if k.startswith(f"{key_layer}.")})
+
+        return weight_states
 
 
 class EmotionalTextualResponseGeneratorMapping:
@@ -680,7 +740,7 @@ class MultiModelEmotionClassifierMapping:
         """
         return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['classifier', ]).compute
 
-    def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
+    def trainer_args_train(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
                            save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
                            per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
