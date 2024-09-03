@@ -520,8 +520,11 @@ class TextualResponseGenerator(EncoderDecoderModel):
                     self.word_freq[k] += v
 
         def calc_weight():
-            RF = self.word_freq / self.word_freq.sum()
-            a = -1 / RF.max()
+            epsilon = 1e-10
+            word_freq_sum = torch.clamp(self.word_freq.sum(), min=epsilon)
+            RF = self.word_freq / word_freq_sum
+            RF_MAX = torch.clamp(RF.max(), min=epsilon)
+            a = -1 / RF_MAX
             weight = a * RF + 1
             weight = weight / weight.sum() * len(weight)
 
