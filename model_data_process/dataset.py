@@ -218,7 +218,7 @@ class MELDDataset(torch.utils.data.Dataset):
 
     SPLIT_PATHS = {'train': {'metadata': 'train_sent_emo.csv',
                              'folder': 'train/train_splits'},
-                   'validation': {'metadata': 'dev_sent_emo_dya.csv',
+                   'validation': {'metadata': 'dev_sent_emo.csv',
                                   'folder': 'dev/dev_splits_complete'},
                    'test': {'metadata': 'test_sent_emo.csv',
                             'folder': 'test/output_repeated_splits_test'}}
