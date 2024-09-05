@@ -46,6 +46,14 @@ class EvaluateInterface(BaseInterface):
             'required': False,
             'default': 1
         },
+        
+        'push_to_hub': {
+            'help': 'Whether or not to push the model to the Hub every time the model is saved. if it is true please'
+                    'fill information on .env file',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
     }
 
     def save_result(self, prediction_output: PredictionOutput, config, default_path: str):
