@@ -46,7 +46,7 @@ class EvaluateInterface(BaseInterface):
             'required': False,
             'default': 1
         },
-        
+
         'push_to_hub': {
             'help': 'Whether or not to push the model to the Hub every time the model is saved. if it is true please'
                     'fill information on .env file',
@@ -101,7 +101,7 @@ class EvaluateInterface(BaseInterface):
                        EarlyStoppingCallback(early_stopping_patience=2)]
         )
         predictions = trainer.predict(test_dataset=test_dataset)
-        self.save_result(prediction_output=predictions, default_path=config.default_save_dir())
+        self.save_result(prediction_output=predictions, config=config, default_path=config.default_save_dir())
 
 
 if __name__ == "__main__":
