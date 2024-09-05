@@ -100,12 +100,15 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                                                   context_key_name='history',
                                                   label_key_name='label')
             data = process_manager.two_party_reformat(raw_dataset=raw_dataset)
+            print('finish new version', split)
 
             if add_knowledge:
                 data = cls._add_knowledge_to_conv(dataset=data)
+                print('finish add knowledge', split)
 
             if add_examples:
                 data = cls.add_examples(data=data, split=split)
+                print('finish add examples', split)
 
             # save dataset on cache'_
             if not os.path.exists(os.path.dirname(file_path)):
@@ -127,7 +130,8 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         knw_added_dataset = list()
-
+        count = 0
+        length = len(dataset)
         for record in dataset:
             social, event, entity = KnowledgeGenerator.run(texts=record['history'])
             record_plus_knw = {cls.SOCIAL_REL_KEY_NAME: social,
@@ -135,7 +139,8 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                                cls.ENTITY_REL_KEY_NAME: entity}
             record_plus_knw.update(record)
             knw_added_dataset.append(record_plus_knw)
-
+            print('add knowledge for one record', count, length)
+            count += 1
         return knw_added_dataset
 
     @classmethod
@@ -156,11 +161,15 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
                                              conv_key_name='original_conv_id')
 
+        count = 0
+        length = len(data)
         for record in data:
             record['history_str'] = ", ".join(record['history'])
             record['xReact'] = list(record['social_rel'].values())[0]['xReact']
             record = example_retriever(record)
             new_dataset.append(record)
+            print('add examples for one record', count, length)
+            count += 1
 
         return new_dataset
 
@@ -423,12 +432,15 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                                                   context_key_name='history',
                                                   label_key_name='label')
             data = process_manager.two_party_reformat(raw_dataset=raw_dataset)
+            print('finish new version', split)
 
             if add_knowledge:
                 data = cls._add_knowledge_to_conv(dataset=data)
+                print('finish add knowledge', split)
 
             if add_examples:
                 data = cls.add_examples(data=data, split=split)
+                print('finish add examples', split)
 
             # save dataset on cache'_
             if not os.path.exists(os.path.dirname(file_path)):
@@ -451,6 +463,8 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         """
         knw_added_dataset = list()
 
+        count = 0
+        length = len(dataset)
         for record in dataset:
             social, event, entity = KnowledgeGenerator.run(texts=record['history'])
             record_plus_knw = {cls.SOCIAL_REL_KEY_NAME: social,
@@ -458,6 +472,8 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                                cls.ENTITY_REL_KEY_NAME: entity}
             record_plus_knw.update(record)
             knw_added_dataset.append(record_plus_knw)
+            print('add knowledge for one record', count, length)
+            count += 1
 
         return knw_added_dataset
 
@@ -479,11 +495,15 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
                                              conv_key_name='original_conv_id')
 
+        count = 0
+        length = len(data)
         for record in data:
             record['history_str'] = ", ".join(record['history'])
             record['xReact'] = list(record['social_rel'].values())[0]['xReact']
             record = example_retriever(record)
             new_dataset.append(record)
+            print('add examples for one record', count, length)
+            count += 1
 
         return new_dataset
 
