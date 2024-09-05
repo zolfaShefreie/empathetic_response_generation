@@ -31,6 +31,12 @@ class TrainInterface(BaseInterface):
             'required': True
         },
 
+        'early_stopping_patience': {
+            'help': 'number of patient epoch. it must be positive integer',
+            'type': int,
+            'required': True
+        },
+
         'save_dir': {
             'help': 'diractory of model',
             'required': False,
@@ -127,6 +133,11 @@ class TrainInterface(BaseInterface):
             raise argparse.ArgumentTypeError(f"{value} is an invalid positive int value")
         return value
 
+    def validate_early_stopping_patience(self, value):
+        if value <= 0:
+            raise argparse.ArgumentTypeError(f"{value} is an invalid positive int value")
+        return value
+
     def _run_main_process(self):
         config = self.MAP_CONFIGS[self.model]()
 
@@ -160,7 +171,7 @@ class TrainInterface(BaseInterface):
             compute_metrics=config.metric_func(),
             callbacks=[SaveHistoryCallback(),
                        DefaultFlowCallback(),
-                       EarlyStoppingCallback(early_stopping_patience=2)]
+                       EarlyStoppingCallback(early_stopping_patience=self.early_stopping_patience)]
         )
 
         train_is_done = False

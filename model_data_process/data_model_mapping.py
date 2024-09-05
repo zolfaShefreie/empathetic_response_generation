@@ -168,6 +168,7 @@ class MultiModalResponseGeneratorMapping:
             per_device_train_batch_size=per_device_train_batch_size,
             per_device_eval_batch_size=per_device_eval_batch_size,
             num_train_epochs=number_of_epochs,
+            report_to=['tensorboard'],
 
             # config for load and save best model
             load_best_model_at_end=load_best_model_at_end,
@@ -391,6 +392,7 @@ class TextualResponseGeneratorMapping:
             per_device_train_batch_size=per_device_train_batch_size,
             per_device_eval_batch_size=per_device_eval_batch_size,
             num_train_epochs=number_of_epochs,
+            report_to=['tensorboard'],
 
             # config for load and save best model
             load_best_model_at_end=load_best_model_at_end,
@@ -613,6 +615,7 @@ class EmotionalTextualResponseGeneratorMapping:
             per_device_train_batch_size=per_device_train_batch_size,
             per_device_eval_batch_size=per_device_eval_batch_size,
             num_train_epochs=number_of_epochs,
+            report_to=['tensorboard'],
 
             # config for load and save best model
             load_best_model_at_end=load_best_model_at_end,
@@ -760,6 +763,7 @@ class MultiModelEmotionClassifierMapping:
             per_device_train_batch_size=per_device_train_batch_size,
             per_device_eval_batch_size=per_device_eval_batch_size,
             num_train_epochs=number_of_epochs,
+            report_to=['tensorboard'],
 
             # config for load and save best model
             load_best_model_at_end=load_best_model_at_end,
