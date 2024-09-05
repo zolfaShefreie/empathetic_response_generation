@@ -755,7 +755,8 @@ class PostProcessResult:
     @classmethod
     def classifier_result(cls, pred, labels):
         result = 1 / (1 + np.exp(-pred))
-        return np.argmax(result, axis=-1), labels
+        result = np.argmax(result, axis=-1).tolist()
+        return {'pred': result, 'labels': labels if isinstance(labels, list) else labels.tolist()}
 
     def text_generator_result(self, pred, labels):
         pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
