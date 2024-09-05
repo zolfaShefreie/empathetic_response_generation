@@ -9,7 +9,7 @@ from utils.preprocessing import Pipeline, ConversationFormatter, ConversationTok
     ToNumpy, ToLong, KnowledgeFormatter, KnowledgeTokenizer, FilterSample, PreProcessEncoderDecoderInputDictVersion, \
     ExampleTokenizer, AudioFeatureExtractor, PostProcessResult
 from settings import DEFAULT_SAVE_DIR_PREFIX, HUB_ACCESS_TOKEN, MELD_DATASET_PATH, \
-    HUB_BIMODEL_ID, HUB_BIMODEL_PRIVATE_REPO, BMEDIALOGUES_PATH, HUB_EMO_TEXT_MODEL_ID, HUB_EMO_TEXT_PRIVATE_REPO, \
+    HUB_BIMODEL_MODEL_ID, HUB_BIMODEL_PRIVATE_REPO, BMEDIALOGUES_PATH, HUB_EMO_TEXT_MODEL_ID, HUB_EMO_TEXT_PRIVATE_REPO, \
     HUB_CLASSIFIER_MODEL_ID, HUB_CLASSIFIER_PRIVATE_REPO, HUB_TEXT_MODEL_ID, HUB_TEXT_PRIVATE_REPO
 from utils.metrics import Metrics
 from utils.trainer import Seq2SeqTrainerMultiLoss, MultiTaskTrainer
@@ -128,7 +128,7 @@ class MultiModalResponseGeneratorMapping:
         :return:
         """
         return {
-            'hub_model_id': HUB_BIMODEL_ID,
+            'hub_model_id': HUB_BIMODEL_MODEL_ID,
             'hub_private_repo': HUB_BIMODEL_PRIVATE_REPO,
             'hub_token': HUB_ACCESS_TOKEN
         }
