@@ -1,5 +1,5 @@
 # the source of this code is from
-# https://github.com/Sahandfer/CEM
+# https://github.com/Sahandfer/CEM with some changes
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -44,7 +44,15 @@ class Comet:
         self.model.zero_grad()
 
     def generate(self, input_event, rel, num_generate=5):
-        query = "{} {} [GEN]".format(input_event, rel)
+        if isinstance(input_event, list) and isinstance(rel, list):
+            if len(input_event) != len(rel):
+                raise Exception('unmatched sizes of input_event and rel')
+
+            map_input_rel = [(input_event[i], rel[i]) for i in range(len(input_event))]
+        else:
+            map_input_rel = [(input_event, rel)]
+
+        query = ["{} {} [GEN]".format(i, r) for i, r in map_input_rel]
 
         with torch.no_grad():
             query = self.tokenizer(
@@ -68,4 +76,4 @@ class Comet:
                 clean_up_tokenization_spaces=False,
             )
 
-            return dec
+            return [list(each) for each in zip(*[iter(dec)] * num_generate)]

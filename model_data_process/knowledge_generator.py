@@ -51,24 +51,33 @@ class KnowledgeGenerator:
         :param text:
         :return:
         """
-        return cls._generate_knowledge(texts=[text, ], relations=list(cls.SOCIAL_INTERACTION_REL.keys()))
+
+        return cls._generate_knowledge(texts=[text for i in range(len(cls.SOCIAL_INTERACTION_REL.keys()))],
+                                       relations=list(cls.SOCIAL_INTERACTION_REL.keys()))
 
     @classmethod
     def get_event_base_knowledge(cls, text: str) -> dict:
         """
         generate some nodes that have event-based relations with text
         :param text: 
-        :return: 
+        :return:
         """
         tokenized_sentences = sent_tokenize(text)
-        return cls._generate_knowledge(texts=tokenized_sentences, relations=list(cls.EVENT_CENTERED_REL.keys()))
+        text_list = list()
+        relations = list()
+        for txt in tokenized_sentences:
+            for rel in list(cls.EVENT_CENTERED_REL.keys()):
+                text_list.append(txt)
+                relations.append(rel)
+
+        return cls._generate_knowledge(texts=text_list, relations=relations)
 
     @classmethod
     def get_entity_knowledge(cls, text: str) -> dict:
         """
         generate some nodes that have entity-based relations with entities of text
         :param text: 
-        :return: 
+        :return:
         """
         all_entities = list()
 
@@ -84,11 +93,18 @@ class KnowledgeGenerator:
             sentence_entity = [each[0] for each in tagged if 'NN' in each[1] and (tagged not in all_entities)]
             all_entities += sentence_entity
 
+        text_list = list()
+        relations = list()
+        for txt in all_entities:
+            for rel in list(cls.PHYSICAL_ENTITIES.keys()):
+                text_list.append(txt)
+                relations.append(rel)
+
         # generate nodes for each entity and rel
-        return cls._generate_knowledge(texts=all_entities, relations=list(cls.PHYSICAL_ENTITIES.keys()))
+        return cls._generate_knowledge(texts=text_list, relations=relations)
 
     @classmethod
-    def _generate_knowledge(cls, texts: list, relations: list):
+    def _generate_knowledge(cls, texts: list, relations: list, batch_size=32):
         """
         generate nodes for each nodes and relation
         :param texts: list of nodes
@@ -106,14 +122,31 @@ class KnowledgeGenerator:
             }
         """
         result = dict()
-        for entity in texts:
-            gen_results = dict()
-            for rel in relations:
-                generated_nodes = cls.clean_comet_results(cls.COMET.generate(entity, rel=rel))
-                gen_results.update({rel: generated_nodes})
-            result.update({entity: gen_results})
+        for i in range(int(len(texts) / batch_size) + 1):
+            batched_text = texts[i * batch_size: (i + 1) * batch_size]
+            batch_rel = relations[i * batch_size: (i + 1) * batch_size]
+            batch_generated_nodes = cls.COMET.generate(batched_text, rel=batch_rel)
+            generated_nodes = [cls.clean_comet_results(each) for each in batch_generated_nodes]
+
+            # aggregate result
+            for i in range(len(batched_text)):
+                k = batched_text[i]
+                v = {batch_rel[i]: generated_nodes[i]}
+                value_total_result = result.get(k, dict())
+                value_total_result.update(v)
+                result.update({k: value_total_result})
 
         return result
+
+        # result = dict()
+        # for entity in texts:
+        #     gen_results = dict()
+        #     for rel in relations:
+        #         generated_nodes = cls.clean_comet_results(cls.COMET.generate(entity, rel=rel))
+        #         gen_results.update({rel: generated_nodes})
+        #     result.update({entity: gen_results})
+        #
+        # return result
     
     @classmethod
     def run(cls, texts: list, get_all_knw: bool = True):
