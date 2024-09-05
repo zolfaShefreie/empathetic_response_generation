@@ -52,8 +52,11 @@ class Comet:
         else:
             map_input_rel = [(input_event, rel)]
 
-        query = ["{} {} [GEN]".format(i, r) for i, r in map_input_rel]
-
+        if map_input_rel:
+            query = ["{} {} [GEN]".format(i, r) for i, r in map_input_rel]
+        else:
+            query = "{} {} [GEN]".format("", "")
+        print(query)
         with torch.no_grad():
             query = self.tokenizer(
                 query, return_tensors="pt", truncation=True, padding="max_length"
