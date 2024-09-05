@@ -904,6 +904,7 @@ class TextAudioIntegrator(PreTrainedModel):
         :return:
         """
         eps = 1e-6
+        device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 
         # pooled input
         text_embedding_mean_pool = torch.mean(text_embedding, dim=1, keepdim=True)
@@ -922,12 +923,12 @@ class TextAudioIntegrator(PreTrainedModel):
         em_norm = text_embedding_mean_pool.norm(2, dim=-1)
         hm_norm = h_m.norm(2, dim=-1)
 
-        hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True)
+        hm_norm_ones = torch.ones(hm_norm.shape, requires_grad=True).to(device)
         hm_norm = torch.where(hm_norm == 0, hm_norm_ones, hm_norm)
 
         thresh_hold = (em_norm / (hm_norm + eps)) * self.beta_shift
 
-        ones = torch.ones(thresh_hold.shape, requires_grad=True)
+        ones = torch.ones(thresh_hold.shape, requires_grad=True).to(device)
 
         alpha = torch.min(thresh_hold, ones)
         alpha = alpha.unsqueeze(dim=-1)
