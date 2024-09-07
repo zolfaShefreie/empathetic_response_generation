@@ -66,9 +66,10 @@ class KnowledgeGenerator:
         text_list = list()
         relations = list()
         for txt in tokenized_sentences:
-            for rel in list(cls.EVENT_CENTERED_REL.keys()):
-                text_list.append(txt)
-                relations.append(rel)
+            if txt not in text_list:
+                for rel in list(cls.EVENT_CENTERED_REL.keys()):
+                    text_list.append(txt)
+                    relations.append(rel)
 
         return cls._generate_knowledge(texts=text_list, relations=relations)
 
@@ -90,15 +91,16 @@ class KnowledgeGenerator:
             tagged = nltk.pos_tag(words_list)
             # get all nouns as entities
             # set isn't used for remain seq sort on text
-            sentence_entity = [each[0] for each in tagged if 'NN' in each[1] and (tagged not in all_entities)]
+            sentence_entity = [each[0] for each in tagged if 'NN' in each[1] and (each[0] not in all_entities)]
             all_entities += sentence_entity
 
         text_list = list()
         relations = list()
         for txt in all_entities:
-            for rel in list(cls.PHYSICAL_ENTITIES.keys()):
-                text_list.append(txt)
-                relations.append(rel)
+            if txt not in text_list:
+                for rel in list(cls.PHYSICAL_ENTITIES.keys()):
+                    text_list.append(txt)
+                    relations.append(rel)
 
         # generate nodes for each entity and rel
         return cls._generate_knowledge(texts=text_list, relations=relations)
@@ -164,5 +166,5 @@ class KnowledgeGenerator:
         if not get_all_knw:
             return social_result, None, None
         return (social_result,
-                cls.get_event_base_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0])),
-                cls.get_entity_knowledge(text=", ".join([text for i, text in enumerate(texts) if i % 2 == 0])))
+                cls.get_event_base_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0]).replace('..', '.')),
+                cls.get_entity_knowledge(text=". ".join([text for i, text in enumerate(texts) if i % 2 == 0]).replace('..', '.')))
