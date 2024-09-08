@@ -1,4 +1,5 @@
 """source is https://github.com/declare-lab/exemplary-empathy/blob/main/dpr_exempler_retriever.py"""
+import time
 import faiss
 from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer
@@ -36,6 +37,7 @@ class ExampleRetriever:
                 count -= 1
                 if count == 0:
                     raise e
+                time.sleep(1)
 
         self.load_fine_tuned_dpr()
         self.CTX_MODEL.eval()
