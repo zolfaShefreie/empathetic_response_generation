@@ -35,7 +35,7 @@ class ExampleRetriever:
                 print(e)
                 count -= 1
                 if count == 0:
-                    raise(e)
+                    raise e
 
         self.load_fine_tuned_dpr()
         self.CTX_MODEL.eval()
