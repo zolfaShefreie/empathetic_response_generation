@@ -22,10 +22,21 @@ class ExampleRetriever:
         self.conv_key_name = conv_key_name
 
         # models initials
-        self.CTX_MODEL = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base").cuda()
-        self.QS_MODEL = DPRQuestionEncoder.from_pretrained("facebook/dpr-question_encoder-single-nq-base").cuda()
-        self.CTX_TOKENIZER = DPRContextEncoderTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
-        self.QS_TOKENIZER = DPRQuestionEncoderTokenizer.from_pretrained("facebook/dpr-question_encoder-single-nq-base")
+        # from_pretrained gets ssl exception so i put the code inside the try catch
+        count = 10
+        while True:
+            try:
+                self.CTX_MODEL = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base").cuda()
+                self.QS_MODEL = DPRQuestionEncoder.from_pretrained("facebook/dpr-question_encoder-single-nq-base").cuda()
+                self.CTX_TOKENIZER = DPRContextEncoderTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
+                self.QS_TOKENIZER = DPRQuestionEncoderTokenizer.from_pretrained("facebook/dpr-question_encoder-single-nq-base")
+                break
+            except Exception as e:
+                print(e)
+                count -= 1
+                if count == 0:
+                    raise(e)
+
         self.load_fine_tuned_dpr()
         self.CTX_MODEL.eval()
         self.QS_MODEL.eval()
