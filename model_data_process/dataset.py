@@ -389,27 +389,78 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
     EVENT_REL_KEY_NAME = 'event_rel'
     ENTITY_REL_KEY_NAME = 'entity_rel'
 
-    def __init__(self, dataset_dir: str = None, split='train', transform=None, include_audio: bool = True):
+    def __init__(self, dataset_dir: str = None, split='train', transform=None, include_audio: bool = True,
+                 chunk_length: int = 2000):
         if dataset_dir is None:
             dataset_dir = self.get_from_huggingface()
-        self.data = self.conv_preprocess(split=split, dataset_dir=dataset_dir)
+        self.chunk_length = chunk_length
+        self.data = self.conv_process_chunk_management(split=split, dataset_dir=dataset_dir)
         self.include_audio = include_audio
         if include_audio:
             self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
         self.transform = transform
         self.n_sample = len(self.data)
 
-    @classmethod
-    def conv_preprocess(cls, dataset_dir: str,  split: str, add_knowledge: bool = True, add_examples: bool = True) -> list:
+    def conv_process_chunk_management(self, dataset_dir: str,  split: str, add_knowledge: bool = True,
+                                      add_examples: bool = True):
+
+        file_path = f"{self.CACHE_PATH}/{self.DATASET_NAME}_{split}"
+        if os.path.exists(file_path):
+            # load data from cache
+            with open(file_path, mode='r', encoding='utf-8') as file:
+                content = file.read()
+                return ast.literal_eval(content)
+
+        else:
+            conv_num = int(len(pd.read_csv(f"{dataset_dir}/{split}/metadata.csv"))/2)
+
+            for chunk_index in range(int(conv_num / self.chunk_length) + 1):
+                self.conv_preprocess(split=split, add_knowledge=add_knowledge, add_examples=add_examples,
+                                     chunk_index=chunk_index, dataset_dir=dataset_dir)
+                print(f"chunk: {chunk_index} finished")
+
+            data = self.merge_sub_data(split=split, number_chunks=int(conv_num / self.chunk_length) + 1)
+
+            if not os.path.exists(os.path.dirname(file_path)):
+                try:
+                    os.makedirs(os.path.dirname(file_path))
+                except OSError as exc:
+                    print(exc)
+                    pass
+            with open(file_path, mode='w', encoding='utf-8') as file:
+                file.write(str(data))
+
+            return data
+
+    def merge_sub_data(self, split: str, number_chunks: int) -> list:
+        """
+        merge all files for chunks
+        :param split:
+        :param number_chunks:
+        :return:
+        """
+        merged_data = list()
+        for i in range(number_chunks):
+            file_path = f"{self.CACHE_PATH}/{self.DATASET_NAME}_{split}_{i}"
+            if os.path.exists(file_path):
+                # load data from cache
+                with open(file_path, mode='r', encoding='utf-8') as file:
+                    content = file.read()
+                    merged_data.append(ast.literal_eval(content))
+        return merged_data
+
+    def conv_preprocess(self, dataset_dir: str, split: str, chunk_index: int, add_knowledge: bool = True,
+                        add_examples: bool = True) -> list:
         """
         change the format of dataset
+        :param chunk_index:
         :param dataset_dir:
         :param add_examples:
         :param split: train/test/validation
         :param add_knowledge: add knowledge to each conversation
         :return: dataset with new format
         """
-        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"
+        file_path = f"{self.CACHE_PATH}/{self.DATASET_NAME}_{split}_{chunk_index}"
         if os.path.exists(file_path):
             # load data from cache
             with open(file_path, mode='r', encoding='utf-8') as file:
@@ -431,16 +482,17 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                                                   responses_in_history=True,
                                                   context_key_name='history',
                                                   label_key_name='label')
-            data = process_manager.two_party_reformat(raw_dataset=raw_dataset)
+            data = process_manager.two_party_reformat(raw_dataset=raw_dataset)[chunk_index * self.chunk_length:
+                                                                               (chunk_index + 1) * self.chunk_length]
             print('finish new version', split)
 
             if add_knowledge:
-                data = cls._add_knowledge_to_conv(dataset=data)
-                print('finish add knowledge', split)
+                data = self._add_knowledge_to_conv(dataset=data)
+                print('finish add knowledge', split, chunk_index)
 
             if add_examples:
-                data = cls.add_examples(data=data, split=split)
-                print('finish add examples', split)
+                data = self.add_examples(data=data, split=split)
+                print('finish add examples', split, chunk_index)
 
             # save dataset on cache'_
             if not os.path.exists(os.path.dirname(file_path)):
@@ -451,6 +503,8 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                     pass
             with open(file_path, mode='w', encoding='utf-8') as file:
                 file.write(str(data))
+
+            # torch.cuda.empty_cache()
 
             return data
 
