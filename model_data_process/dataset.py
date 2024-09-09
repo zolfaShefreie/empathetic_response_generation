@@ -446,7 +446,7 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                 # load data from cache
                 with open(file_path, mode='r', encoding='utf-8') as file:
                     content = file.read()
-                    merged_data.append(ast.literal_eval(content))
+                    merged_data += ast.literal_eval(content)
         return merged_data
 
     def conv_preprocess(self, dataset_dir: str, split: str, chunk_index: int, add_knowledge: bool = True,
