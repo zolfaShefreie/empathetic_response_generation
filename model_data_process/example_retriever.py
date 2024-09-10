@@ -38,6 +38,7 @@ class ExampleRetriever:
                 if count == 0:
                     raise e
                 time.sleep(1)
+        self.QS_TOKENIZER.truncation_side = "left"
 
         self.load_fine_tuned_dpr()
         self.CTX_MODEL.eval()

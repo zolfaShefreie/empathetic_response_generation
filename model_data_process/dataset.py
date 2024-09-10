@@ -158,7 +158,7 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         train_df = pd.DataFrame(train_df)
         train_df['xReact'] = train_df['social_rel'].apply(lambda x: list(x.values())[0]['xReact'])
         train_df['history_str'] = train_df['history'].apply(lambda x: ", ".join(x))
-        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
+        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='label', qs_key_name='history_str',
                                              conv_key_name='original_conv_id')
 
         count = 0
@@ -540,13 +540,11 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         :return:
         """
         new_dataset = list()
-        train_df = data if 'train' in split else EmpatheticDialoguesDataset.conv_preprocess(split='train',
-                                                                                            add_knowledge=True,
-                                                                                            add_examples=False)
+        train_df = EmpatheticDialoguesDataset.conv_preprocess(split='train', add_knowledge=True, add_examples=False)
         train_df = pd.DataFrame(train_df)
         train_df['xReact'] = train_df['social_rel'].apply(lambda x: list(x.values())[0]['xReact'])
         train_df['history_str'] = train_df['history'].apply(lambda x: ", ".join(x))
-        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='history_str', qs_key_name='label',
+        example_retriever = ExampleRetriever(train_df=train_df, ctx_key_name='label', qs_key_name='history_str',
                                              conv_key_name='original_conv_id')
 
         count = 0
