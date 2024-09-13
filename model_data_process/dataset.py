@@ -469,7 +469,7 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
 
         else:
             # reformat empathetic_dialogues dataset
-            raw_dataset = pd.read_csv(f"{dataset_dir}/{split}/metadata.csv")
+            raw_dataset = pd.read_csv(f"{dataset_dir}/{split}/metadata.csv").fillna(-1)
             raw_dataset = raw_dataset.to_dict('records')
             process_manager = NewVersionDialogues(conv_id_key_name='conv_id',
                                                   turn_key_name='utter_id',

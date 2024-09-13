@@ -83,7 +83,7 @@ class ExampleRetriever:
 
         retrieved, matches = np.array(I[0]), []
         for item in retrieved:
-            if item in candidate_indices:
+            if item in candidate_indices and item not in matches:
                 matches.append(item)
             if len(matches) == 10:
                 break
