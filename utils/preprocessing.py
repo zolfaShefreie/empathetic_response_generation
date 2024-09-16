@@ -103,11 +103,15 @@ class NewVersionDialogues:
 
         conversations = list()
         conv_id = 0
-        is_user_turn = True
+        is_user_turn, prv_is_user_turn = True, None
         current_conversation = self._empty_conv_dict(conv_id=conv_id)
         previous_record = dict()
 
         for record in raw_dataset:
+
+            # if it is the record of new conversation, we should set that now is user turn
+            if current_conversation[self.ORIGINAL_CONV_ID_KEY_NAME] != record[self.conv_id_key_name]:
+                is_user_turn = True
 
             # if it is the user turn
             if is_user_turn:
@@ -116,7 +120,7 @@ class NewVersionDialogues:
                 if current_conversation[self.ORIGINAL_CONV_ID_KEY_NAME] != record[self.conv_id_key_name] and \
                         previous_record:
                     # merge conversation with previous record as label
-                    if not self.new_conv_each_sys_responses:
+                    if not self.new_conv_each_sys_responses and not prv_is_user_turn:
                         conversations.append(self._merge_conv_record(record=previous_record,
                                                                      current_conv=current_conversation,
                                                                      is_label=True))
@@ -149,9 +153,10 @@ class NewVersionDialogues:
 
             # setup for end of the loop
             previous_record = record
+            prv_is_user_turn = is_user_turn
             is_user_turn = not is_user_turn
 
-        if is_user_turn and previous_record:
+        if is_user_turn and previous_record and not self.new_conv_each_sys_responses:
             conversations.append(self._merge_conv_record(record=previous_record,
                                                          current_conv=current_conversation,
                                                          is_label=True))
