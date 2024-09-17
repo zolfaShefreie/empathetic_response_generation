@@ -203,12 +203,7 @@ class Pipeline:
 
     def __call__(self, data):
         for func in self.functions:
-            print('before:')
-            print(data)
             data = func(data)
-            print('after:')
-            print(data)
-            print("____________________________________________")
         return data
 
 
