@@ -203,37 +203,43 @@ class Pipeline:
 
     def __call__(self, data):
         for func in self.functions:
+            print('before:')
+            print(data)
             data = func(data)
+            print('after:')
+            print(data)
+            print("____________________________________________")
         return data
 
 
 class TextCleaner:
     PUNC = '''!()-[]{.};:'"\,<>/?@#$%^&*_~`|’“”…—–'''
 
-    def __init__(self, texts_key_name: str = 'history'):
+    def __init__(self, texts_key_name: list, erase_punc=True):
         self.texts_key_name = texts_key_name
+        self.erase_punc = erase_punc
 
-    @classmethod
-    def _clean_single_text(cls, text: str) -> str:
+    def _clean_single_text(self, text: str) -> str:
         """
         return cleaned text
         :param text:
         :return:
         """
         text = text.lower()
-        for each in cls.PUNC:
-            text = text.replace(each, ' ')
+        if self.erase_punc:
+            for each in self.PUNC:
+                text = text.replace(each, ' ')
+        text = text.replace('_comma_', ',')
 
         return text
 
-    @classmethod
-    def _clean_list_of_texts(cls, texts: list) -> list:
+    def _clean_list_of_texts(self, texts: list) -> list:
         """
         clean list of texts
         :param texts:
         :return:
         """
-        return [cls._clean_single_text(text) for text in texts]
+        return [self._clean_single_text(text) for text in texts]
 
     def __call__(self, sample):
         """
@@ -241,14 +247,16 @@ class TextCleaner:
         :param sample:
         :return:
         """
-        # texts = sample[0][0] if self.have_label else sample[0]
-        texts = sample[self.texts_key_name]
+        result = dict()
+        for each_key in self.texts_key_name:
+            texts = sample[each_key]
 
-        # value of each (row, col) can be list type or str type
-        cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
-            else self._clean_single_text(texts)
+            # value of each (row, col) can be list type or str type
+            cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
+                else self._clean_single_text(texts)
+            result[each_key] = cleaned_result
 
-        sample[self.texts_key_name] = cleaned_result
+        sample.update(result)
         return sample
 
 

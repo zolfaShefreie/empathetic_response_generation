@@ -57,7 +57,7 @@ class MultiModalResponseGeneratorMapping:
                                                   max_len=source_max_len)
 
         self.TRANSFORMS = Pipeline(functions=[
-            TextCleaner(texts_key_name='history'),
+            TextCleaner(texts_key_name=['history', 'label', 'examples'], erase_punc=False),
             ConversationFormatter(history_key_name='history',
                                   gen_label_key_name='label',
                                   last_utter_key_name='last_utter',
@@ -285,7 +285,7 @@ class TextualResponseGeneratorMapping:
                                                   max_len=source_max_len)
 
         self.TRANSFORMS = Pipeline(functions=[
-            TextCleaner(texts_key_name='history'),
+            TextCleaner(texts_key_name=['history', 'label', 'examples'], erase_punc=False),
             ConversationFormatter(history_key_name='history',
                                   gen_label_key_name='label',
                                   last_utter_key_name='last_utter',
@@ -507,7 +507,7 @@ class EmotionalTextualResponseGeneratorMapping:
                                                   max_len=source_max_len)
 
         self.TRANSFORMS = Pipeline(functions=[
-            TextCleaner(texts_key_name='history'),
+            TextCleaner(texts_key_name=['history', 'label', 'examples'], erase_punc=False),
             ConversationFormatter(history_key_name='history',
                                   gen_label_key_name='label',
                                   last_utter_key_name='last_utter',
@@ -685,7 +685,7 @@ class MultiModelEmotionClassifierMapping:
                                                             gen_label_ids_key_name=None)
 
         self.TRANSFORMS = Pipeline(functions=[
-            TextCleaner(texts_key_name='history'),
+            TextCleaner(texts_key_name=['history']),
             ConversationFormatter(history_key_name='history',
                                   last_utter_key_name='last_utter'),
             ToNumpy(unwanted_keys=['audio']),
