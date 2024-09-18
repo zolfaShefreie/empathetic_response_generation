@@ -500,9 +500,14 @@ class ExampleTokenizer:
         :return:
         """
         data = dict()
-        for i in range(min(len(sample[self.example_key_name]), self.number_of_examples)):
 
-            inputs = self.tokenizer.encode_plus(sample[self.example_key_name][i],
+        examples = sample[self.example_key_name]
+        for i in range(self.number_of_examples - min(len(examples), self.number_of_examples)):
+            examples.append("")
+
+        for i in range(len(examples)):
+
+            inputs = self.tokenizer.encode_plus(examples[i],
                                                 add_special_tokens=True,
                                                 max_length=self.MAX_LEN,
                                                 padding='max_length',
