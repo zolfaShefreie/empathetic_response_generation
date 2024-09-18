@@ -1,3 +1,5 @@
+import requests
+
 from utils.interface import BaseInterface
 from model_data_process.data_model_mapping import MultiModalResponseGeneratorMapping, TextualResponseGeneratorMapping,\
     EmotionalTextualResponseGeneratorMapping, MultiModelEmotionClassifierMapping
@@ -181,7 +183,7 @@ class TrainInterface(BaseInterface):
                     trainer.args.output_dir) is None else True)
                 trainer.save_model()
                 train_is_done = True
-            except Exception as e:
+            except requests.exceptions.RequestException as e:
                 print(e)
 
 

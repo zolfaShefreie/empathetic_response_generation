@@ -341,10 +341,10 @@ class KnowledgeFormatter:
         :return:
         """
         if len(nodes) == 0:
-            return None
+            return str()
         if len(nodes) == 1:
             return nodes[0]
-        return ", ".join(nodes[:-1]) + f" and {nodes[-1]}"
+        return ", ".join(each for each in nodes[:-1] if each) + f" and {nodes[-1]}"
 
     def _convert_nodes_with_rel(self, nodes: list, rel: str, root_node: str = None) -> str:
         """
@@ -374,11 +374,11 @@ class KnowledgeFormatter:
         """
         social_knw_result = list(results.values())[0]
         other_rel_reformat = ".\n".join([self._convert_nodes_with_rel(nodes=rel_nodes,
-                                                                     rel=rel_name,
-                                                                     root_node=None)
+                                                                      rel=rel_name,
+                                                                      root_node=None)
                                          for rel_name, rel_nodes in social_knw_result.items()
                                          if rel_name != 'xReact'])
-        return ", ".join(social_knw_result['xReact']), other_rel_reformat
+        return ", ".join(each for each in social_knw_result['xReact'] if each), other_rel_reformat
 
     def _formatting_event_entity_rel_results(self, results: dict) -> str:
         """
@@ -387,8 +387,8 @@ class KnowledgeFormatter:
         :return: text version of these data
         """
         return ".\n".join([self._convert_nodes_with_rel(nodes=nodes,
-                                                       rel=rel_name,
-                                                       root_node=text)
+                                                        rel=rel_name,
+                                                        root_node=text)
                            for text, rel_nodes in results.items()
                            for rel_name, nodes in rel_nodes.items()])
 
