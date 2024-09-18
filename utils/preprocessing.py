@@ -501,7 +501,7 @@ class ExampleTokenizer:
         """
         data = dict()
 
-        examples = sample[self.example_key_name]
+        examples = sample[self.example_key_name].tolist()
         for i in range(self.number_of_examples - min(len(examples), self.number_of_examples)):
             examples.append("")
 
