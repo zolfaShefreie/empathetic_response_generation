@@ -314,14 +314,20 @@ class TextualResponseGenerator(EncoderDecoderModel):
         self.criterion = torch.nn.NLLLoss(ignore_index=config.pad_token_id, reduction="sum")
 
         # models for losses
-        self.empathy_classifier_model1 = T5EncoderClassifier("base", 'microsoft/DialoGPT-small', 2, 0)
+        self.empathy_classifier_model1 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
         self.empathy_classifier_model1.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600015/model.pt",
                                                                   map_location=torch.device('cpu') if not torch.cuda.is_available()
                                                                   else torch.device("cuda")))
         for param in self.empathy_classifier_model1.parameters():
             param.requires_grad = False
 
-        self.empathy_classifier_model2 = T5EncoderClassifier("base", 'microsoft/DialoGPT-small', 2, 0)
+        self.empathy_classifier_model2 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
         self.empathy_classifier_model2.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600805/model.pt",
                                                                   map_location=torch.device(
                                                                       'cpu') if not torch.cuda.is_available()
@@ -329,7 +335,10 @@ class TextualResponseGenerator(EncoderDecoderModel):
         for param in self.empathy_classifier_model2.parameters():
             param.requires_grad = False
 
-        self.empathy_classifier_model3 = T5EncoderClassifier("base", 'microsoft/DialoGPT-small', 2, 0)
+        self.empathy_classifier_model3 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
         self.empathy_classifier_model3.load_state_dict(torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619601340/model.pt",
                                                                   map_location=torch.device(
                                                                       'cpu') if not torch.cuda.is_available()

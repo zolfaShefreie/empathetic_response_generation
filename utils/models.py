@@ -257,7 +257,8 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
 class T5EncoderClassifier(nn.Module):
     """the source of model is from https://github.com/declare-lab/exemplary-empathy but small changes are applied"""
-    def __init__(self, size, base_encoder_nam: str, num_labels=2, strategy=0, target_max_len=100, ctx_max_len=300):
+    def __init__(self, size, base_context_encoder_name: str, base_target_encoder_name: str, num_labels=2, strategy=0,
+                 target_max_len=100, ctx_max_len=300):
         super().__init__()
 
         if size == "base":
@@ -267,9 +268,10 @@ class T5EncoderClassifier(nn.Module):
 
         self.tokenizer = T5Tokenizer.from_pretrained('google-t5/t5-base')
         self.model = T5EncoderModel.from_pretrained("google-t5/t5-base")
-        self.base_tokenizer = AutoTokenizer.from_pretrained(base_encoder_nam)
-        if self.base_tokenizer.pad_token is None:
-            self.base_tokenizer.pad_token = self.base_tokenizer.eos_token
+        self.base_context_encoder_name = AutoTokenizer.from_pretrained(base_context_encoder_name)
+        self.base_target_encoder_name = AutoTokenizer.from_pretrained(base_target_encoder_name)
+        if self.base_target_encoder_name.pad_token is None:
+            self.base_target_encoder_name.pad_token = self.base_target_encoder_name.eos_token
         self.classifier = nn.Linear(in_features, num_labels)
         self.strategy = strategy
         self.target_max_len = target_max_len
@@ -294,8 +296,11 @@ class T5EncoderClassifier(nn.Module):
             probs = F.gumbel_softmax(logits, tau=1, hard=True)
         return probs
 
-    def convert_to_own_tokenize(self, context_input_ids, max_len=768):
-        context = self.base_tokenizer.batch_decode(context_input_ids, skip_special_tokens=True)
+    def convert_to_own_tokenize(self, context_input_ids, max_len=768, is_target=False):
+        if is_target:
+            context = self.base_target_encoder_name.batch_decode(context_input_ids, skip_special_tokens=True)
+        else:
+            context = self.base_context_encoder_name.batch_decode(context_input_ids, skip_special_tokens=True)
         batch = self.tokenizer(context, max_length=max_len, padding=True, truncation=True, return_tensors="pt")
         return batch['input_ids'], batch['attention_mask']
 
@@ -309,7 +314,7 @@ class T5EncoderClassifier(nn.Module):
         '''
         device = 'cpu' if not torch.cuda.is_available() else 'cuda'
         # encode context #
-        context_ids, context_mask = self.convert_to_own_tokenize(context_input_ids=context_input_ids)
+        context_ids, context_mask = self.convert_to_own_tokenize(context_input_ids=context_input_ids, is_target=False)
         context_ids = context_ids.to(device)
         context_mask = context_mask.to(device)
 
@@ -317,7 +322,8 @@ class T5EncoderClassifier(nn.Module):
         decoded_probabilities = self.convert_to_probabilities(decoded_logits)
         generated_response = torch.argmax(decoded_probabilities, dim=2)
         response_input_ids, response_att_mask = self.convert_to_own_tokenize(generated_response,
-                                                                             max_len=self.target_max_len)
+                                                                             max_len=self.target_max_len,
+                                                                             is_target=True)
         response_input_ids = response_input_ids.to(device)
         response_att_mask = response_att_mask.to(device)
 
