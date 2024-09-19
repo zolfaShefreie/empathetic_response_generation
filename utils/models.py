@@ -268,6 +268,8 @@ class T5EncoderClassifier(nn.Module):
         self.tokenizer = T5Tokenizer.from_pretrained('google-t5/t5-base')
         self.model = T5EncoderModel.from_pretrained("google-t5/t5-base")
         self.base_tokenizer = AutoTokenizer.from_pretrained(base_encoder_nam)
+        if self.base_tokenizer.pad_token is None:
+            self.base_tokenizer.pad_token = self.base_tokenizer.eos_token
         self.classifier = nn.Linear(in_features, num_labels)
         self.strategy = strategy
         self.target_max_len = target_max_len

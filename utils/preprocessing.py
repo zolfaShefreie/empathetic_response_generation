@@ -550,10 +550,12 @@ class ConversationTokenizer:
     """works with dictionaries as input and output"""
 
     def __init__(self,
-                 tokenizer,
+                 source_tokenizer,
+                 target_tokenizer,
                  source_max_len=128,
                  label_max_len=100,
-                 new_special_tokens=None,
+                 source_new_special_tokens=None,
+                 target_new_special_tokens=None,
                  last_utter_key_name: str = 'last_utter',
                  history_key_name: str = 'history',
                  gen_label_key_name: str = 'label',
@@ -565,10 +567,10 @@ class ConversationTokenizer:
                  gen_label_token_type_key_name: str = 'gen_label_token_type', ):
         """
 
-        :param tokenizer:
+        :param source_tokenizer:
         :param source_max_len:
         :param label_max_len:
-        :param new_special_tokens:
+        :param source_new_special_tokens:
         :param last_utter_key_name:
         :param history_key_name:
         :param gen_label_key_name:
@@ -579,11 +581,16 @@ class ConversationTokenizer:
         :param gen_label_mask_key_name:
         :param gen_label_token_type_key_name:
         """
-        self.tokenizer = tokenizer
-        self.tokenizer.truncation_side = 'left'
+        self.source_tokenizer = source_tokenizer
+        self.source_tokenizer.truncation_side = 'left'
 
-        if new_special_tokens:
-            self.tokenizer.add_special_tokens(new_special_tokens)
+        self.target_tokenizer = target_tokenizer
+
+        if source_new_special_tokens:
+            self.source_tokenizer.add_special_tokens(source_new_special_tokens)
+
+        if target_new_special_tokens:
+            self.target_tokenizer.add_special_tokens(target_new_special_tokens)
 
         self.source_max_len = source_max_len
         self.label_max_len = label_max_len
@@ -604,26 +611,26 @@ class ConversationTokenizer:
         :param sample: get context, last_utter and response (response is optional)
         :return:
         """
-        inputs = self.tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
-                                            add_special_tokens=True,
-                                            max_length=self.source_max_len,
-                                            padding='max_length',
-                                            return_attention_mask=True,
-                                            return_token_type_ids=True,
-                                            truncation=True)
+        inputs = self.source_tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
+                                                   add_special_tokens=True,
+                                                   max_length=self.source_max_len,
+                                                   padding='max_length',
+                                                   return_attention_mask=True,
+                                                   return_token_type_ids=True,
+                                                   truncation=True)
 
         sample[self.context_ids_key_name] = inputs['input_ids']
         sample[self.context_mask_key_name] = inputs['attention_mask']
         sample[self.context_token_type_key_name] = inputs['token_type_ids']
 
         if self.gen_label_key_name in sample.keys():
-            label = self.tokenizer.encode_plus(sample[self.gen_label_key_name][0],
-                                               add_special_tokens=True,
-                                               max_length=self.label_max_len,
-                                               padding='max_length',
-                                               return_attention_mask=True,
-                                               return_token_type_ids=True,
-                                               truncation=True)
+            label = self.target_tokenizer.encode_plus(sample[self.gen_label_key_name][0],
+                                                      add_special_tokens=True,
+                                                      max_length=self.label_max_len,
+                                                      padding='max_length',
+                                                      return_attention_mask=True,
+                                                      return_token_type_ids=True,
+                                                      truncation=True)
             sample[self.gen_label_ids_key_name] = label['input_ids']
             sample[self.gen_label_mask_key_name] = label['attention_mask']
             sample[self.gen_label_token_type_key_name] = label['token_type_ids']

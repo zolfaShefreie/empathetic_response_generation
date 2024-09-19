@@ -15,7 +15,7 @@ from utils.metrics import Metrics
 from utils.trainer import Seq2SeqTrainerMultiLoss, MultiTaskTrainer
 
 from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor, Trainer, Seq2SeqTrainingArguments, \
-    TrainingArguments, EvalPrediction
+    TrainingArguments, EvalPrediction, AutoTokenizer
 
 
 class MultiModalResponseGeneratorMapping:
@@ -30,19 +30,21 @@ class MultiModalResponseGeneratorMapping:
         self.ModelClass = MultiModalResponseGenerator
         self.TrainerClass = Seq2SeqTrainerMultiLoss
 
-        self.CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                            source_max_len=source_max_len,
-                                                            label_max_len=target_max_len,
-                                                            new_special_tokens={
-                                                               'pad_token': '<pad>'
-                                                            },
-                                                            last_utter_key_name='last_utter',
-                                                            history_key_name='history',
-                                                            gen_label_key_name='label',
-                                                            context_ids_key_name='input_ids',
-                                                            context_mask_key_name='attention_mask',
-                                                            context_token_type_key_name='token_type_ids',
-                                                            gen_label_ids_key_name='labels')
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
+        self.CONVERSATION_TOKENIZER = ConversationTokenizer(
+            source_tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
+            target_tokenizer=tokenizer,
+            source_max_len=source_max_len,
+            label_max_len=target_max_len,
+            source_new_special_tokens={'pad_token': '<pad>'},
+            target_new_special_tokens={'pad_token': tokenizer.unk_token},
+            last_utter_key_name='last_utter',
+            history_key_name='history',
+            gen_label_key_name='label',
+            context_ids_key_name='input_ids',
+            context_mask_key_name='attention_mask',
+            context_token_type_key_name='token_type_ids',
+            gen_label_ids_key_name='labels')
 
         self.KNOWLEDGE_TOKENIZER = KnowledgeTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
                                                       react_key_name='react_rel',
@@ -83,7 +85,7 @@ class MultiModalResponseGeneratorMapping:
                                      [f"example_{i}_{suffix}" for i in range(0, 5)
                                       for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
             ToTensor(),
-            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                                      gen_label_key_name='labels'),
             ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'audio_attention_mask'] +
                                [f"{rel_name}_{suffix}" for rel_name in ['react_rel', 'social_rel', 'event_rel',
@@ -93,7 +95,7 @@ class MultiModalResponseGeneratorMapping:
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
 
-        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                               task_list=['text_generator', ])
 
     def dataset_args(self, split: str = 'train'):
@@ -109,12 +111,13 @@ class MultiModalResponseGeneratorMapping:
         :return:
         """
         config = MultiModalResponseGeneratorConfig(
-            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
-            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.source_tokenizer),
+            decoder_vocab_size=len(self.CONVERSATION_TOKENIZER.target_tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.target_tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.target_tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.pad_token_id,
             kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
@@ -144,7 +147,7 @@ class MultiModalResponseGeneratorMapping:
         """
         :return:
         """
-        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['text_generator', ]).compute
+        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer, task_list=['text_generator', ]).compute
 
     def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
@@ -258,19 +261,21 @@ class TextualResponseGeneratorMapping:
         self.ModelClass = TextualResponseGenerator
         self.TrainerClass = Seq2SeqTrainerMultiLoss
 
-        self.CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                            source_max_len=source_max_len,
-                                                            label_max_len=target_max_len,
-                                                            new_special_tokens={
-                                                                'pad_token': '<pad>'
-                                                            },
-                                                            last_utter_key_name='last_utter',
-                                                            history_key_name='history',
-                                                            gen_label_key_name='label',
-                                                            context_ids_key_name='input_ids',
-                                                            context_mask_key_name='attention_mask',
-                                                            context_token_type_key_name='token_type_ids',
-                                                            gen_label_ids_key_name='labels')
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
+        self.CONVERSATION_TOKENIZER = ConversationTokenizer(
+            source_tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
+            target_tokenizer=tokenizer,
+            source_max_len=source_max_len,
+            label_max_len=target_max_len,
+            source_new_special_tokens={'pad_token': '<pad>'},
+            target_new_special_tokens={'pad_token': tokenizer.unk_token},
+            last_utter_key_name='last_utter',
+            history_key_name='history',
+            gen_label_key_name='label',
+            context_ids_key_name='input_ids',
+            context_mask_key_name='attention_mask',
+            context_token_type_key_name='token_type_ids',
+            gen_label_ids_key_name='labels')
 
         self.KNOWLEDGE_TOKENIZER = KnowledgeTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
                                                       react_key_name='react_rel',
@@ -306,7 +311,7 @@ class TextualResponseGeneratorMapping:
                                      [f"example_{i}_{suffix}" for i in range(0, 5)
                                       for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
             ToTensor(),
-            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                                      gen_label_key_name='labels'),
             ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', ] +
                                [f"{rel_name}_{suffix}" for rel_name in ['react_rel', 'social_rel', 'event_rel',
@@ -316,7 +321,7 @@ class TextualResponseGeneratorMapping:
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
 
-        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                               task_list=['text_generator', ])
 
     def dataset_args(self, split: str = 'train'):
@@ -332,12 +337,13 @@ class TextualResponseGeneratorMapping:
         :return:
         """
         config = TextualResponseGeneratorConfig(
-            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
-            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.source_tokenizer),
+            decoder_vocab_size=len(self.CONVERSATION_TOKENIZER.target_tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.target_tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.target_tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.pad_token_id,
             kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
@@ -368,7 +374,7 @@ class TextualResponseGeneratorMapping:
         """
         :return:
         """
-        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['text_generator', ]).compute
+        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer, task_list=['text_generator', ]).compute
 
     def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
@@ -480,19 +486,21 @@ class EmotionalTextualResponseGeneratorMapping:
         self.ModelClass = EmotionRoberta2DialoGPT
         self.TrainerClass = MultiTaskTrainer
 
-        self.CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                            source_max_len=source_max_len,
-                                                            label_max_len=target_max_len,
-                                                            new_special_tokens={
-                                                                'pad_token': '<pad>'
-                                                            },
-                                                            last_utter_key_name='last_utter',
-                                                            history_key_name='history',
-                                                            gen_label_key_name='label',
-                                                            context_ids_key_name='input_ids',
-                                                            context_mask_key_name='attention_mask',
-                                                            context_token_type_key_name='token_type_ids',
-                                                            gen_label_ids_key_name='labels')
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
+        self.CONVERSATION_TOKENIZER = ConversationTokenizer(
+            source_tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
+            target_tokenizer=tokenizer,
+            source_max_len=source_max_len,
+            label_max_len=target_max_len,
+            source_new_special_tokens={'pad_token': '<pad>'},
+            target_new_special_tokens={'pad_token': tokenizer.unk_token},
+            last_utter_key_name='last_utter',
+            history_key_name='history',
+            gen_label_key_name='label',
+            context_ids_key_name='input_ids',
+            context_mask_key_name='attention_mask',
+            context_token_type_key_name='token_type_ids',
+            gen_label_ids_key_name='labels')
 
         self.KNOWLEDGE_TOKENIZER = KnowledgeTokenizer(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"),
                                                       react_key_name='react_rel',
@@ -528,7 +536,7 @@ class EmotionalTextualResponseGeneratorMapping:
                                      [f"example_{i}_{suffix}" for i in range(0, 5)
                                       for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
             ToTensor(),
-            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+            PreProcessEncoderDecoderInputDictVersion(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                                      gen_label_key_name='labels'),
             ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'emotion_labels'] +
                                [f"{rel_name}_{suffix}" for rel_name in ['react_rel', 'social_rel', 'event_rel',
@@ -537,8 +545,7 @@ class EmotionalTextualResponseGeneratorMapping:
                                [f"example_{i}_{suffix}" for i in range(0, 5)
                                 for suffix in ['input_ids', 'attention_mask', 'token_type_ids']]),
         ])
-
-        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                               task_list=['text_generator', 'classifier'])
 
     def dataset_args(self, split: str = 'train'):
@@ -555,12 +562,13 @@ class EmotionalTextualResponseGeneratorMapping:
         :return:
         """
         config = EmotionRoberta2DialoGPTConfig(
-            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer),
-            special_token_dict={each: self.CONVERSATION_TOKENIZER.tokenizer(each, add_special_tokens=False)['input_ids'][0]
-                                for each in self.CONVERSATION_TOKENIZER.tokenizer.all_special_tokens},
-            bos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.bos_token_id,
-            eos_token_id=self.CONVERSATION_TOKENIZER.tokenizer.eos_token_id,
-            pad_token_id=self.CONVERSATION_TOKENIZER.tokenizer.pad_token_id,
+            embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.source_tokenizer),
+            decoder_vocab_size=len(self.CONVERSATION_TOKENIZER.target_tokenizer),
+            special_token_dict={each: self.CONVERSATION_TOKENIZER.target_tokenizer(each, add_special_tokens=False)['input_ids'][0]
+                                for each in self.CONVERSATION_TOKENIZER.target_tokenizer.all_special_tokens},
+            bos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.bos_token_id,
+            eos_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.eos_token_id,
+            pad_token_id=self.CONVERSATION_TOKENIZER.target_tokenizer.pad_token_id,
             num_labels=32,
             kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
             div_loss_weight=div_loss_weight,
@@ -590,7 +598,7 @@ class EmotionalTextualResponseGeneratorMapping:
         """
         :return:
         """
-        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                        task_list=['text_generator', 'classifier']).compute
 
     def trainer_args_train(self, save_dir: str=None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
@@ -670,19 +678,20 @@ class MultiModelEmotionClassifierMapping:
         self.ModelClass = MultiModelEmotionClassifier
         self.TrainerClass = Trainer
 
-        self.CONVERSATION_TOKENIZER = ConversationTokenizer(tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
-                                                            source_max_len=source_max_len,
-                                                            new_special_tokens={
-                                                               'additional_special_tokens': [
-                                                                   ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
-                                                               'pad_token': '[PAD]'},
-                                                            last_utter_key_name='last_utter',
-                                                            history_key_name='history',
-                                                            gen_label_key_name='label',
-                                                            context_ids_key_name='input_ids',
-                                                            context_mask_key_name='attention_mask',
-                                                            context_token_type_key_name='token_type_ids',
-                                                            gen_label_ids_key_name=None)
+        self.CONVERSATION_TOKENIZER = ConversationTokenizer(
+            source_tokenizer=RobertaTokenizer.from_pretrained("roberta-base"),
+            target_tokenizer=None,
+            source_max_len=source_max_len,
+            source_new_special_tokens={'additional_special_tokens': [
+                ConversationFormatter.SPECIAL_TOKEN_SPLIT_UTTERANCE, ],
+                'pad_token': '[PAD]'},
+            last_utter_key_name='last_utter',
+            history_key_name='history',
+            gen_label_key_name='label',
+            context_ids_key_name='input_ids',
+            context_mask_key_name='attention_mask',
+            context_token_type_key_name='token_type_ids',
+            gen_label_ids_key_name=None)
 
         self.TRANSFORMS = Pipeline(functions=[
             TextCleaner(texts_key_name=['history']),
@@ -700,7 +709,7 @@ class MultiModelEmotionClassifierMapping:
             ToLong(wanted_list=['input_ids', 'attention_mask', 'token_type_ids', 'labels', 'audio_attention_mask']),
         ])
 
-        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer,
+        self.post_process = PostProcessResult(tokenizer=self.CONVERSATION_TOKENIZER.target_tokenizer,
                                               task_list=['classifier', ])
 
     def dataset_args(self, split: str = 'train'):
@@ -716,7 +725,7 @@ class MultiModelEmotionClassifierMapping:
         :return:
         """
         config = MultiModelEmotionClassifierConfig(text_audio_emo_num_classes=7,
-                                                   embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.tokenizer))
+                                                   embedding_tokens_len=len(self.CONVERSATION_TOKENIZER.source_tokenizer))
         return {'config': config}
 
     @staticmethod
@@ -741,7 +750,7 @@ class MultiModelEmotionClassifierMapping:
         """
         :return:
         """
-        return Metrics(tokenizer=self.CONVERSATION_TOKENIZER.tokenizer, task_list=['classifier', ]).compute
+        return Metrics(tokenizer=None, task_list=['classifier', ]).compute
 
     def trainer_args_train(self, save_dir: str = None, evaluation_strategy: str = "epoch", eval_steps: int = 4,
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,

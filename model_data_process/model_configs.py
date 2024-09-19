@@ -18,9 +18,11 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
     model_type = 'textual_response_generator'
 
     def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
-                 embedding_tokens_len=50267, empathy_loss_weight=0.1, main_loss_weight=1, div_loss_weight=1.5,
+                 embedding_tokens_len=50265, decoder_vocab_size=50257, empathy_loss_weight=0.1,
+                 main_loss_weight=1, div_loss_weight=1.5,
                  ** kwargs):
-        encoder_decoder_args = self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len)
+        encoder_decoder_args = self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len,
+                                                            decoder_vocab_size=decoder_vocab_size)
         KnowledgeEncoderConfig.__init__(self, **kwargs)
         EncoderDecoderConfig.__init__(self, **encoder_decoder_args)
         self.decoder_start_token_id = bos_token_id
@@ -29,6 +31,7 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
         self.eos_token_id = eos_token_id
         self.pad_token_id = pad_token_id
         self.embedding_tokens_len = embedding_tokens_len
+        self.decoder_vocab_size = decoder_vocab_size
         self.empathy_loss_weight = empathy_loss_weight
         self.main_loss_weight = main_loss_weight
         self.div_loss_weight = div_loss_weight
@@ -41,10 +44,10 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
         self.no_repeat_ngram_size = 3
         self.length_penalty = 2.0
         self.num_beams = 4
-        self.vocab_size = self.encoder.vocab_size
+        self.vocab_size = self.decoder.vocab_size
         self.is_encoder_decoder = True
 
-    def initial_encoder_decoder(self, embedding_tokens_len):
+    def initial_encoder_decoder(self, embedding_tokens_len, decoder_vocab_size):
         result = dict()
 
         config_encoder = AutoConfig.from_pretrained('roberta-base')
@@ -60,7 +63,8 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
 
         if embedding_tokens_len:
             encoder.resize_token_embeddings(embedding_tokens_len)
-            decoder.resize_token_embeddings(embedding_tokens_len)
+        if decoder_vocab_size:
+            decoder.resize_token_embeddings(decoder_vocab_size)
 
         decoder.config.is_decoder = True
         decoder.config.add_cross_attention = True
