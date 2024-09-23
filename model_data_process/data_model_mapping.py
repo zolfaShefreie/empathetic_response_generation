@@ -184,8 +184,9 @@ class MultiModalResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -207,8 +208,9 @@ class MultiModalResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -411,8 +413,9 @@ class TextualResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -434,8 +437,9 @@ class TextualResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -636,8 +640,9 @@ class EmotionalTextualResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -659,8 +664,9 @@ class EmotionalTextualResponseGeneratorMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -785,8 +791,9 @@ class MultiModelEmotionClassifierMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
@@ -807,8 +814,9 @@ class MultiModelEmotionClassifierMapping:
             hub_model_id=self.hub_args()['hub_model_id'],
             hub_private_repo=self.hub_args()['hub_private_repo'],
             hub_token=self.hub_args()['hub_token'],
-            hub_strategy='checkpoint',
-            resume_from_checkpoint='last-checkpoint',
+            hub_strategy='end',
+            # hub_strategy='checkpoint',
+            # resume_from_checkpoint='last-checkpoint',
             save_safetensors=False,
         )
 
