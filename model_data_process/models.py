@@ -311,7 +311,7 @@ class TextualResponseGenerator(EncoderDecoderModel):
 
         self.special_token_dict = self.config.special_token_dict
         self.word_freq = torch.zeros(self.config.vocab_size)
-        self.criterion = torch.nn.NLLLoss(ignore_index=config.pad_token_id, reduction="sum")
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=config.pad_token_id)
 
         # models for losses
         self.empathy_classifier_model1 = T5EncoderClassifier(size="base",
@@ -510,7 +510,7 @@ class TextualResponseGenerator(EncoderDecoderModel):
 
     def compute_face_loss(self, labels=None, logits=None):
         """
-        the source of code is https://github.com/Sahandfer/CEM
+        the source of code is https://github.com/ShaojieJiang/FACE
         :param labels:
         :param logits:
         :return:
@@ -545,16 +545,15 @@ class TextualResponseGenerator(EncoderDecoderModel):
             preds = clean_preds(logits)
             update_frequency(preds)
             self.criterion.weight = calc_weight().to(device)
-            no_pad_label = labels[labels != -100]
-            target_tokens = no_pad_label.long().sum().item()
+            # no_pad_label = labels[labels != -100]
+            # target_tokens = no_pad_label.long().sum().item()
             pad_labels = labels.clone().detach()
             pad_labels[pad_labels == -100] = self.config.pad_token_id
             div_loss = self.criterion(
                 logits.contiguous().view(-1, logits.size(-1)).to(device),
                 pad_labels.contiguous().view(-1).to(device),
             )
-
-            div_loss /= target_tokens
+            # div_loss /= target_tokens
             return div_loss
 
         return None
