@@ -38,12 +38,31 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
 
         # sensible parameters for beam search
         # set decoding params
+        # self.max_new_tokens = 64
+        # self.min_length = 2
+        # self.early_stopping = True
+        # self.no_repeat_ngram_size = 3
+        # self.length_penalty = 2.0
+        # self.num_beams = 4
+
+        # sampling configs
+        # self.max_new_tokens = 64
+        # self.min_length = 2
+        # self.early_stopping = True
+        # self.do_sample = True
+        # self.top_k = 30
+        # self.temperature = 0.9
+        # self.top_p = 0.95
+        # self.repetition_penalty = 1.2
+
+        # eta sampling
+        self.eta_cutoff = 0.002
+        self.epsilon_cutoff = 0.0006
+        self.do_sample = True
+        self.repetition_penalty = 1.2
         self.max_new_tokens = 64
         self.min_length = 2
-        self.early_stopping = True
-        self.no_repeat_ngram_size = 3
-        self.length_penalty = 2.0
-        self.num_beams = 4
+
         self.vocab_size = self.decoder.vocab_size
         self.is_encoder_decoder = True
 
