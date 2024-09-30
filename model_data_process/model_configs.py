@@ -57,7 +57,7 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
 
         # eta sampling
         self.eta_cutoff = 0.002
-        self.epsilon_cutoff = 0.0006
+        # self.epsilon_cutoff = 0.0006
         self.do_sample = True
         self.repetition_penalty = 1.2
         self.max_new_tokens = 64
