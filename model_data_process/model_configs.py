@@ -48,7 +48,6 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
         # sampling configs
         self.max_new_tokens = 64
         self.min_length = 2
-        self.early_stopping = True
         self.do_sample = True
         self.top_k = 20
         self.temperature = 0.9
