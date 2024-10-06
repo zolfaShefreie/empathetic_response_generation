@@ -754,7 +754,8 @@ class AudioFeatureExtractor:
         result = self.feature_extractor(sample[self.audio_key_name]['array'],
                                         sampling_rate=self.feature_extractor.sampling_rate,
                                         max_length=16000,
-                                        truncation=True)
+                                        truncation=True,
+                                        padding="max_length")
 
         sample.update({f"{self.result_prefix_key_name}_{k}": v[0] for k, v in result.items()})
         return sample

@@ -51,8 +51,11 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
         self.do_sample = True
         self.top_k = 20
         self.temperature = 0.9
-        self.top_p = 0.95
-        self.repetition_penalty = 1.2
+        self.top_p = 0.9
+        self.repetition_penalty = 1.5
+        self.num_beams = 8
+        self.early_stopping = True
+        self.no_repeat_ngram_size = 3
 
         # eta sampling
         # self.eta_cutoff = 0.002
