@@ -623,7 +623,7 @@ class ConversationTokenizer:
         sample[self.context_mask_key_name] = inputs['attention_mask']
         sample[self.context_token_type_key_name] = inputs['token_type_ids']
 
-        if self.gen_label_key_name in sample.keys():
+        if self.gen_label_key_name in sample.keys() and self.target_tokenizer is not None:
             label = self.target_tokenizer.encode_plus(sample[self.gen_label_key_name][0],
                                                       add_special_tokens=True,
                                                       max_length=self.label_max_len,
