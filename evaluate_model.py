@@ -84,7 +84,7 @@ class EvaluateInterface(BaseInterface):
     }
 
     def validate_generation_config_path(self, value):
-        if not os.path.exists(value):
+        if value is not None and not os.path.exists(value):
             return None
         return value
 
