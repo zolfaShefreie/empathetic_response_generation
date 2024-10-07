@@ -26,6 +26,27 @@ class EvaluateInterface(BaseInterface):
             'required': True
         },
 
+        'include_knowledge': {
+            'help': 'is encoded context combined to encoded knowledge?',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
+        'include_example': {
+            'help': 'is encoded context combined to encoded examples?',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
+        'include_emp_losses': {
+            'help': 'model include empathy losses',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
         'save_dir': {
             'help': 'diractory of model',
             'required': False,
@@ -79,7 +100,9 @@ class EvaluateInterface(BaseInterface):
             file.write(str(data))
 
     def _run_main_process(self):
-        config = self.MAP_CONFIGS[self.model]()
+        config = self.MAP_CONFIGS[self.model](include_knowledge=self.include_knowledge,
+                                              include_example=self.include_example,
+                                              include_emp_losses=self.include_emp_losses)
 
         test_dataset = config.DatasetClass(**config.dataset_args(split='test'))
 

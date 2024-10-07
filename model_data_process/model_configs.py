@@ -19,12 +19,18 @@ class TextualResponseGeneratorConfig(EncoderDecoderConfig, KnowledgeEncoderConfi
 
     def __init__(self, special_token_dict: dict, bos_token_id=0, eos_token_id=2, pad_token_id=50266,
                  embedding_tokens_len=50265, decoder_vocab_size=50257, empathy_loss_weight=0.1,
-                 main_loss_weight=1, div_loss_weight=1.5,
+                 main_loss_weight=1, div_loss_weight=1.5, include_knowledge: bool = True,
+                 include_example: bool = True, include_emp_losses: bool = True,
                  ** kwargs):
         encoder_decoder_args = self.initial_encoder_decoder(embedding_tokens_len=embedding_tokens_len,
                                                             decoder_vocab_size=decoder_vocab_size)
         KnowledgeEncoderConfig.__init__(self, **kwargs)
         EncoderDecoderConfig.__init__(self, **encoder_decoder_args)
+
+        self.include_knowledge = include_knowledge
+        self.include_example = include_example
+        self.include_emp_losses = include_emp_losses
+
         self.decoder_start_token_id = bos_token_id
         self.special_token_dict = special_token_dict
         self.bos_token_id = bos_token_id

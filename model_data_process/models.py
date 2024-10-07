@@ -407,44 +407,49 @@ class TextualResponseGenerator(EncoderDecoderModel):
                 return_dict=True,
                 **kwargs_encoder
             )
+            last_hidden_state = encoder_outputs.last_hidden_state
 
-            encoded_knowledge = self.knowledge_encoder(
-                react_rel_input_ids=react_rel_input_ids,
-                react_rel_attention_mask=react_rel_attention_mask,
-                react_rel_token_type_ids=react_rel_token_type_ids,
-                social_rel_input_ids=social_rel_input_ids,
-                social_rel_attention_mask=social_rel_attention_mask,
-                social_rel_token_type_ids=social_rel_token_type_ids,
-                event_rel_input_ids=event_rel_input_ids,
-                event_rel_attention_mask=event_rel_attention_mask,
-                event_rel_token_type_ids=event_rel_token_type_ids,
-                entity_rel_input_ids=entity_rel_input_ids,
-                entity_rel_attention_mask=entity_rel_attention_mask,
-                entity_rel_token_type_ids=entity_rel_token_type_ids
-            )
+            if self.config.include_knowledge:
+                print('here knowledge')
+                encoded_knowledge = self.knowledge_encoder(
+                    react_rel_input_ids=react_rel_input_ids,
+                    react_rel_attention_mask=react_rel_attention_mask,
+                    react_rel_token_type_ids=react_rel_token_type_ids,
+                    social_rel_input_ids=social_rel_input_ids,
+                    social_rel_attention_mask=social_rel_attention_mask,
+                    social_rel_token_type_ids=social_rel_token_type_ids,
+                    event_rel_input_ids=event_rel_input_ids,
+                    event_rel_attention_mask=event_rel_attention_mask,
+                    event_rel_token_type_ids=event_rel_token_type_ids,
+                    entity_rel_input_ids=entity_rel_input_ids,
+                    entity_rel_attention_mask=entity_rel_attention_mask,
+                    entity_rel_token_type_ids=entity_rel_token_type_ids
+                )
 
-            encoded_examples = self.example_encoders(
-                example_0_input_ids=example_0_input_ids,
-                example_0_attention_mask=example_0_attention_mask,
-                example_0_token_type_ids=example_0_token_type_ids,
-                example_1_input_ids=example_1_input_ids,
-                example_1_attention_mask=example_1_attention_mask,
-                example_1_token_type_ids=example_1_token_type_ids,
-                example_2_input_ids=example_2_input_ids,
-                example_2_attention_mask=example_2_attention_mask,
-                example_2_token_type_ids=example_2_token_type_ids,
-                example_3_input_ids=example_3_input_ids,
-                example_3_attention_mask=example_3_attention_mask,
-                example_3_token_type_ids=example_3_token_type_ids,
-                example_4_input_ids=example_4_input_ids,
-                example_4_attention_mask=example_4_attention_mask,
-                example_4_token_type_ids=example_4_token_type_ids,
-            )
+                last_hidden_state = encoder_outputs.last_hidden_state + encoded_knowledge
 
-            last_hidden_state = encoder_outputs.last_hidden_state + encoded_knowledge
+            if self.config.include_example:
+                print('here example')
+                encoded_examples = self.example_encoders(
+                    example_0_input_ids=example_0_input_ids,
+                    example_0_attention_mask=example_0_attention_mask,
+                    example_0_token_type_ids=example_0_token_type_ids,
+                    example_1_input_ids=example_1_input_ids,
+                    example_1_attention_mask=example_1_attention_mask,
+                    example_1_token_type_ids=example_1_token_type_ids,
+                    example_2_input_ids=example_2_input_ids,
+                    example_2_attention_mask=example_2_attention_mask,
+                    example_2_token_type_ids=example_2_token_type_ids,
+                    example_3_input_ids=example_3_input_ids,
+                    example_3_attention_mask=example_3_attention_mask,
+                    example_3_token_type_ids=example_3_token_type_ids,
+                    example_4_input_ids=example_4_input_ids,
+                    example_4_attention_mask=example_4_attention_mask,
+                    example_4_token_type_ids=example_4_token_type_ids,
+                )
 
-            if encoded_examples is not None:
-                last_hidden_state = last_hidden_state + encoded_examples
+                if encoded_examples is not None:
+                    last_hidden_state = last_hidden_state + encoded_examples
 
             encoder_outputs['last_hidden_state'] = self.norm_layer(last_hidden_state)
 
@@ -610,16 +615,19 @@ class TextualResponseGenerator(EncoderDecoderModel):
 
             face_loss = self.compute_face_loss(labels=labels, logits=logits)
 
-            empathy_loss = self.compute_empathy_loss(context_input_ids=context_input_ids,
-                                                     labels=labels,
-                                                     logits=logits,
-                                                     response_mask=response_mask)
-            # aggregate losses
-            loss = self.main_loss_weight * main_loss + \
-                   self.empathy_loss_weight * empathy_loss + \
-                   self.div_loss_weight * face_loss
+            loss = self.main_loss_weight * main_loss + self.div_loss_weight * face_loss
+            loss_dict = {'main_loss': main_loss, 'face_loss': face_loss}
 
-            return loss, {'main_loss': main_loss, 'empathy_loss': empathy_loss, 'face_loss': face_loss}
+            if self.config.include_emp_losses:
+                empathy_loss = self.compute_empathy_loss(context_input_ids=context_input_ids,
+                                                         labels=labels,
+                                                         logits=logits,
+                                                         response_mask=response_mask)
+                # aggregate losses
+                loss += self.empathy_loss_weight * empathy_loss
+                loss_dict.update({'empathy_loss': empathy_loss})
+
+            return loss, loss_dict
         
         return loss, {}
 
@@ -683,7 +691,10 @@ class EmotionRoberta2DialoGPT(MultiTaskModel):
                                                                 embedding_tokens_len=self.config.embedding_tokens_len,
                                                                 div_loss_weight=self.config.div_loss_weight,
                                                                 empathy_loss_weight=self.config.empathy_loss_weight,
-                                                                main_loss_weight=self.config.main_loss_weight)
+                                                                main_loss_weight=self.config.main_loss_weight,
+                                                                include_knowledge=self.config.include_knowledge,
+                                                                include_example=self.config.include_example,
+                                                                include_emp_losses=self.config.include_emp_losses)
         self.encoder_decoder = TextualResponseGenerator(config=encoder_decoder_config)
 
         self.emotion_classifier = AutoModelForSequenceClassification.from_pretrained("roberta-base",

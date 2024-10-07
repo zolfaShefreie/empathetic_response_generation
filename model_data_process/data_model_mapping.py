@@ -20,7 +20,9 @@ from transformers import RobertaTokenizer, AlbertTokenizer, AutoFeatureExtractor
 
 class MultiModalResponseGeneratorMapping:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100,
+                 include_knowledge: bool = True, include_example: bool = True, include_emp_losses: bool = True,
+                 *args, **kwargs):
         """
         initial of class obj
         :param source_max_len:
@@ -29,6 +31,10 @@ class MultiModalResponseGeneratorMapping:
         self.DatasetClass = BiMEmpDialoguesDataset
         self.ModelClass = MultiModalResponseGenerator
         self.TrainerClass = Seq2SeqTrainerMultiLoss
+
+        self.include_knowledge = include_knowledge
+        self.include_example = include_example
+        self.include_emp_losses = include_emp_losses
 
         tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
         self.CONVERSATION_TOKENIZER = ConversationTokenizer(
@@ -122,26 +128,53 @@ class MultiModalResponseGeneratorMapping:
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
             empathy_loss_weight=empathy_loss_weight,
-            hidden_size_integrator=768)
+            hidden_size_integrator=768,
+            include_knowledge=self.include_knowledge,
+            include_example=self.include_example,
+            include_emp_losses=self.include_emp_losses)
         return {'config': config}
 
-    @staticmethod
-    def hub_args():
+    def hub_args(self):
         """
         :return:
         """
+        model_id_suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                                    not self.include_emp_losses else ""
+
+        if len(model_id_suffix) > 0:
+            if not self.include_knowledge:
+                model_id_suffix += '_knowledge'
+
+            if not self.include_example:
+                model_id_suffix += '_examples'
+
+            if not self.include_emp_losses:
+                model_id_suffix += '_emp_losses'
+
         return {
-            'hub_model_id': HUB_BIMODEL_MODEL_ID,
+            'hub_model_id': f"{HUB_BIMODEL_MODEL_ID}{model_id_suffix}",
             'hub_private_repo': HUB_BIMODEL_PRIVATE_REPO,
             'hub_token': HUB_ACCESS_TOKEN
         }
 
-    @staticmethod
-    def default_save_dir():
+    def default_save_dir(self):
         """
         :return:
         """
-        return f"{DEFAULT_SAVE_DIR_PREFIX}/empathetic_spoken_chatbot"
+        suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                                    not self.include_emp_losses else ""
+
+        if len(suffix) > 0:
+            if not self.include_knowledge:
+                suffix += '_knowledge'
+
+            if not self.include_example:
+                suffix += '_examples'
+
+            if not self.include_emp_losses:
+                suffix += '_emp_losses'
+
+        return f"{DEFAULT_SAVE_DIR_PREFIX}/empathetic_spoken_chatbot{suffix}"
 
     def metric_func(self):
         """
@@ -253,7 +286,9 @@ class MultiModalResponseGeneratorMapping:
 
 class TextualResponseGeneratorMapping:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100,
+                 include_knowledge: bool = True, include_example: bool = True, include_emp_losses: bool = True,
+                 *args, **kwargs):
         """
 
         :param source_max_len:
@@ -262,6 +297,10 @@ class TextualResponseGeneratorMapping:
         self.DatasetClass = BiMEmpDialoguesDataset
         self.ModelClass = TextualResponseGenerator
         self.TrainerClass = Seq2SeqTrainerMultiLoss
+
+        self.include_knowledge = include_knowledge
+        self.include_example = include_example
+        self.include_emp_losses = include_emp_losses
 
         tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
         self.CONVERSATION_TOKENIZER = ConversationTokenizer(
@@ -350,27 +389,53 @@ class TextualResponseGeneratorMapping:
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
             empathy_loss_weight=empathy_loss_weight,
-            )
+            include_knowledge=self.include_knowledge,
+            include_example=self.include_example,
+            include_emp_losses=self.include_emp_losses)
 
         return {'config': config}
 
-    @staticmethod
-    def hub_args():
+    def hub_args(self):
         """
         :return:
         """
+        model_id_suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                                    not self.include_emp_losses else ""
+
+        if len(model_id_suffix) > 0:
+            if not self.include_knowledge:
+                model_id_suffix += '_knowledge'
+
+            if not self.include_example:
+                model_id_suffix += '_examples'
+
+            if not self.include_emp_losses:
+                model_id_suffix += '_emp_losses'
+
         return {
-            'hub_model_id': HUB_TEXT_MODEL_ID,
+            'hub_model_id': f"{HUB_TEXT_MODEL_ID}{model_id_suffix}",
             'hub_private_repo': HUB_TEXT_PRIVATE_REPO,
             'hub_token': HUB_ACCESS_TOKEN
         }
 
-    @staticmethod
-    def default_save_dir():
+    def default_save_dir(self):
         """
         :return:
         """
-        return f"{DEFAULT_SAVE_DIR_PREFIX}/empathetic_chatbot"
+        suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                           not self.include_emp_losses else ""
+
+        if len(suffix) > 0:
+            if not self.include_knowledge:
+                suffix += '_knowledge'
+
+            if not self.include_example:
+                suffix += '_examples'
+
+            if not self.include_emp_losses:
+                suffix += '_emp_losses'
+
+        return f"{DEFAULT_SAVE_DIR_PREFIX}/empathetic_chatbot{suffix}"
 
     def metric_func(self):
         """
@@ -456,7 +521,7 @@ class TextualResponseGeneratorMapping:
 
         try:
             model = mapping.ModelClass.from_pretrained(mapping.hub_args()['hub_model_id'],
-                                                           token=mapping.hub_args()['hub_token'])
+                                                       token=mapping.hub_args()['hub_token'])
         except Exception as e1:
             print(f'exception from load model: {mapping.ModelClass.__name__}')
             print(e1)
@@ -480,7 +545,9 @@ class TextualResponseGeneratorMapping:
 
 class EmotionalTextualResponseGeneratorMapping:
 
-    def __init__(self, source_max_len: int = 300, target_max_len: int = 100, *args, **kwargs):
+    def __init__(self, source_max_len: int = 300, target_max_len: int = 100,
+                 include_knowledge: bool = True, include_example: bool = True, include_emp_losses: bool = True,
+                 *args, **kwargs):
         """
 
         :param source_max_len:
@@ -489,6 +556,10 @@ class EmotionalTextualResponseGeneratorMapping:
         self.DatasetClass = EmpatheticDialoguesDataset
         self.ModelClass = EmotionRoberta2DialoGPT
         self.TrainerClass = MultiTaskTrainer
+
+        self.include_knowledge = include_knowledge
+        self.include_example = include_example
+        self.include_emp_losses = include_emp_losses
 
         tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
         self.CONVERSATION_TOKENIZER = ConversationTokenizer(
@@ -577,26 +648,53 @@ class EmotionalTextualResponseGeneratorMapping:
             kwn_embedding_tokens_len=len(self.KNOWLEDGE_TOKENIZER.tokenizer),
             div_loss_weight=div_loss_weight,
             main_loss_weight=main_loss_weight,
-            empathy_loss_weight=empathy_loss_weight)
+            empathy_loss_weight=empathy_loss_weight,
+            include_knowledge=self.include_knowledge,
+            include_example=self.include_example,
+            include_emp_losses=self.include_emp_losses)
         return {'config': config}
 
-    @staticmethod
-    def hub_args():
+    def hub_args(self):
         """
         :return:
         """
+        model_id_suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                                    not self.include_emp_losses else ""
+
+        if len(model_id_suffix) > 0:
+            if not self.include_knowledge:
+                model_id_suffix += '_knowledge'
+
+            if not self.include_example:
+                model_id_suffix += '_examples'
+
+            if not self.include_emp_losses:
+                model_id_suffix += '_emp_losses'
+
         return {
-            'hub_model_id': HUB_EMO_TEXT_MODEL_ID,
+            'hub_model_id': f"{HUB_EMO_TEXT_MODEL_ID}{model_id_suffix}",
             'hub_private_repo': HUB_EMO_TEXT_PRIVATE_REPO,
             'hub_token': HUB_ACCESS_TOKEN
         }
 
-    @staticmethod
-    def default_save_dir():
+    def default_save_dir(self):
         """
         :return:
         """
-        return f"{DEFAULT_SAVE_DIR_PREFIX}/emotional_empathetic_chatbot"
+        suffix = f"_wo" if not self.include_knowledge or not self.include_example or \
+                           not self.include_emp_losses else ""
+
+        if len(suffix) > 0:
+            if not self.include_knowledge:
+                suffix += '_knowledge'
+
+            if not self.include_example:
+                suffix += '_examples'
+
+            if not self.include_emp_losses:
+                suffix += '_emp_losses'
+
+        return f"{DEFAULT_SAVE_DIR_PREFIX}/emotional_empathetic_chatbot{suffix}"
 
     def metric_func(self):
         """

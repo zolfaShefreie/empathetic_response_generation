@@ -33,10 +33,32 @@ class TrainInterface(BaseInterface):
             'required': True
         },
 
+        'include_knowledge': {
+            'help': 'is encoded context combined to encoded knowledge?',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
+        'include_example': {
+            'help': 'is encoded context combined to encoded examples?',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
+        'include_emp_losses': {
+            'help': 'model include empathy losses',
+            'type': bool,
+            'required': False,
+            'default': True
+        },
+
         'early_stopping_patience': {
             'help': 'number of patient epoch. it must be positive integer',
             'type': int,
-            'required': True
+            'required': False,
+            'default': 2
         },
 
         'save_dir': {
@@ -141,7 +163,9 @@ class TrainInterface(BaseInterface):
         return value
 
     def _run_main_process(self):
-        config = self.MAP_CONFIGS[self.model]()
+        config = self.MAP_CONFIGS[self.model](include_knowledge=self.include_knowledge,
+                                              include_example=self.include_example,
+                                              include_emp_losses=self.include_emp_losses)
 
         train_dataset = config.DatasetClass(**config.dataset_args(split='train'))
         val_dataset = config.DatasetClass(**config.dataset_args(split='validation'))
