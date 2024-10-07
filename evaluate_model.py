@@ -1,4 +1,4 @@
-from utils.interface import BaseInterface
+from utils.interface import BaseInterface, str2bool
 from model_data_process.data_model_mapping import MultiModalResponseGeneratorMapping, TextualResponseGeneratorMapping,\
     EmotionalTextualResponseGeneratorMapping, MultiModelEmotionClassifierMapping
 from utils.callbacks import SaveHistoryCallback
@@ -28,21 +28,21 @@ class EvaluateInterface(BaseInterface):
 
         'include_knowledge': {
             'help': 'is encoded context combined to encoded knowledge?',
-            'type': bool,
+            'type': str2bool,
             'required': False,
             'default': True
         },
 
         'include_example': {
             'help': 'is encoded context combined to encoded examples?',
-            'type': bool,
+            'type': str2bool,
             'required': False,
             'default': True
         },
 
         'include_emp_losses': {
             'help': 'model include empathy losses',
-            'type': bool,
+            'type': str2bool,
             'required': False,
             'default': True
         },
@@ -77,7 +77,7 @@ class EvaluateInterface(BaseInterface):
         'push_to_hub': {
             'help': 'Whether or not to push the model to the Hub every time the model is saved. if it is true please'
                     'fill information on .env file',
-            'type': bool,
+            'type': str2bool,
             'required': False,
             'default': True
         },
