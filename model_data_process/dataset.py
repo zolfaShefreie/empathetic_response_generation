@@ -396,10 +396,12 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         self.chunk_length = chunk_length
         self.data = self.conv_process_chunk_management(split=split, dataset_dir=dataset_dir)
         self.include_audio = include_audio
-        if include_audio:
-            self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
+        # if include_audio:
+        #     self.data = self._audio_file_preprocessing(data=self.data, dataset_path=dataset_dir, split=split)
         self.transform = transform
         self.n_sample = len(self.data)
+        self.split = split
+        self.dataset_dir = dataset_dir
 
     def conv_process_chunk_management(self, dataset_dir: str,  split: str, add_knowledge: bool = True,
                                       add_examples: bool = True):
@@ -560,6 +562,29 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         return new_dataset
 
     @classmethod
+    def _single_audio_file_preprocessing(cls, record: dict, dataset_path: str, split: str) -> dict:
+        """
+        extract audio and get data of it
+        :param record:
+        :return:
+        """
+
+        def get_path(row):
+            """
+            get path of audio file
+            :param row:
+            :return:
+            """
+            file_path_last_utter = row[cls.FILE_PATH_KEY_NAME][-1]
+            return f"{dataset_path}/{split}/{file_path_last_utter}"
+
+        audio_file_path = get_path(record)
+
+        record[cls.AUDIO_DATA_KEY_NAME] = AudioModule.get_audio_data(file_path=audio_file_path)
+
+        return record
+
+    @classmethod
     def _audio_file_preprocessing(cls, data: list, dataset_path: str, split: str) -> list:
         """
         extract audio and get data of it
@@ -612,7 +637,8 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
         history, label = raw_item_data['history'], raw_item_data['label']
         item_data = {'history': history, 'label': label}
         if self.include_audio:
-            item_data['audio'] = raw_item_data['audio']
+            item_data['audio'] = self._single_audio_file_preprocessing(raw_item_data, split=self.split,
+                                                                       dataset_path=self.dataset_dir)['audio']
 
         if self.SOCIAL_REL_KEY_NAME in raw_item_data.keys():
             item_data.update({

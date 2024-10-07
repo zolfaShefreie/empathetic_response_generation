@@ -1,4 +1,5 @@
 import moviepy.editor as mp
+import numpy as np
 import soundfile as sf
 import librosa
 
@@ -25,13 +26,20 @@ class AudioModule:
         :param file_path:
         :return:
         """
-        array, sr = sf.read(file_path)
-        array = array.T
+        try:
+            array, sr = sf.read(file_path)
+            array = array.T
 
-        if mono:
-            array = librosa.to_mono(array)
-        if sampling_rate and sampling_rate != sr:
-            array = librosa.resample(array, orig_sr=sampling_rate, target_sr=sampling_rate)
-            sr = sampling_rate
+            if mono:
+                array = librosa.to_mono(array)
+            if sampling_rate and sampling_rate != sr:
+                array = librosa.resample(array, orig_sr=sampling_rate, target_sr=sampling_rate)
+                sr = sampling_rate
 
-        return {"path": file_path, "array": array, "sampling_rate": sr}
+            return {"path": file_path, "array": array, "sampling_rate": sr}
+
+        except Exception:
+            return {"path": file_path, "array": np.ndarray([]),
+                    "sampling_rate": 16000 if sampling_rate is None else sampling_rate}
+
+
