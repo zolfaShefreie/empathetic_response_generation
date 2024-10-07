@@ -410,7 +410,6 @@ class TextualResponseGenerator(EncoderDecoderModel):
             last_hidden_state = encoder_outputs.last_hidden_state
 
             if self.config.include_knowledge:
-                print('here knowledge')
                 encoded_knowledge = self.knowledge_encoder(
                     react_rel_input_ids=react_rel_input_ids,
                     react_rel_attention_mask=react_rel_attention_mask,
@@ -429,7 +428,6 @@ class TextualResponseGenerator(EncoderDecoderModel):
                 last_hidden_state = encoder_outputs.last_hidden_state + encoded_knowledge
 
             if self.config.include_example:
-                print('here example')
                 encoded_examples = self.example_encoders(
                     example_0_input_ids=example_0_input_ids,
                     example_0_attention_mask=example_0_attention_mask,
