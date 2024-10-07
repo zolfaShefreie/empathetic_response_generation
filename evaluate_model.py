@@ -53,6 +53,12 @@ class EvaluateInterface(BaseInterface):
             'default': None
         },
 
+        'generation_config_path': {
+            'help': 'path of generation_config (json file)',
+            'required': False,
+            'default': None
+        },
+
         'logging_steps': {
             'help': ' Number of update steps between two logs if logging_strategy="steps". '
                     'Should be an integer',
@@ -76,6 +82,11 @@ class EvaluateInterface(BaseInterface):
             'default': True
         },
     }
+
+    def validate_generation_config_path(self, value):
+        if not os.path.exists(value):
+            return None
+        return value
 
     def save_result(self, prediction_output: PredictionOutput, config, default_path: str):
         """
@@ -114,7 +125,8 @@ class EvaluateInterface(BaseInterface):
         trainer_args = config.trainer_args_evaluate(save_dir=self.save_dir,
                                                     logging_steps=self.logging_steps,
                                                     per_device_eval_batch_size=self.per_device_eval_batch_size,
-                                                    push_to_hub=self.push_to_hub)
+                                                    push_to_hub=self.push_to_hub,
+                                                    generation_config_path=self.generation_config_path)
         trainer = config.TrainerClass(
             model=model,
             args=trainer_args,

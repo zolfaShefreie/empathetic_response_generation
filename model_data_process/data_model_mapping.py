@@ -186,9 +186,11 @@ class MultiModalResponseGeneratorMapping:
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
                            save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
                            per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
-                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True,
+                           generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
@@ -226,9 +228,11 @@ class MultiModalResponseGeneratorMapping:
     def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              push_to_hub: bool = True):
+                              push_to_hub: bool = True,
+                              generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
@@ -447,9 +451,11 @@ class TextualResponseGeneratorMapping:
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
                            save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
                            per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
-                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True,
+                           generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
@@ -487,9 +493,11 @@ class TextualResponseGeneratorMapping:
     def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              push_to_hub: bool = True):
+                              push_to_hub: bool = True,
+                              generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
@@ -707,9 +715,11 @@ class EmotionalTextualResponseGeneratorMapping:
                            save_steps: int = 4, logging_steps: int = 4, learning_rate: float = 1e-5,
                            save_strategy: str = "epoch", per_device_train_batch_size: int = 1,
                            per_device_eval_batch_size: int = 1, number_of_epochs: int = 2,
-                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True):
+                           load_best_model_at_end: bool = True, save_total_limit: int = 2, push_to_hub: bool = True,
+                           generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,
@@ -747,9 +757,10 @@ class EmotionalTextualResponseGeneratorMapping:
     def trainer_args_evaluate(self, save_dir: str = None,
                               logging_steps: int = 4,
                               per_device_eval_batch_size: int = 1,
-                              push_to_hub: bool = True):
+                              push_to_hub: bool = True, generation_config_path: str = None):
 
         return Seq2SeqTrainingArguments(
+            generation_config=generation_config_path,
             predict_with_generate=True,
             output_dir=save_dir if save_dir is not None else self.default_save_dir(),
             overwrite_output_dir=True,

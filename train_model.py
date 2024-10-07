@@ -1,3 +1,5 @@
+import os
+
 import requests
 
 from utils.interface import BaseInterface
@@ -63,6 +65,12 @@ class TrainInterface(BaseInterface):
 
         'save_dir': {
             'help': 'diractory of model',
+            'required': False,
+            'default': None
+        },
+
+        'generation_config_path': {
+            'help': 'path of generation_config (json file)',
             'required': False,
             'default': None
         },
@@ -162,6 +170,11 @@ class TrainInterface(BaseInterface):
             raise argparse.ArgumentTypeError(f"{value} is an invalid positive int value")
         return value
 
+    def validate_generation_config_path(self, value):
+        if not os.path.exists(value):
+            return None
+        return value
+
     def _run_main_process(self):
         config = self.MAP_CONFIGS[self.model](include_knowledge=self.include_knowledge,
                                               include_example=self.include_example,
@@ -187,7 +200,8 @@ class TrainInterface(BaseInterface):
                                                  per_device_eval_batch_size=self.per_device_eval_batch_size,
                                                  number_of_epochs=self.number_of_epochs,
                                                  load_best_model_at_end=self.load_best_model_at_end,
-                                                 save_total_limit=self.save_total_limit, push_to_hub=self.push_to_hub)
+                                                 save_total_limit=self.save_total_limit, push_to_hub=self.push_to_hub,
+                                                 generation_config_path=self.generation_config_path)
 
         trainer = config.TrainerClass(
             model=model,
