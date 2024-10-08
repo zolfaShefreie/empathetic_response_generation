@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from huggingface_hub import snapshot_download
 from datasets import load_dataset
@@ -80,12 +81,20 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
         :param add_knowledge: add knowledge to each conversation
         :return: dataset with new format
         """
-        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}".replace("[", "_").replace(":", "_").replace("]", "_")
+        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}.json".replace("[", "_").replace(":", "_").replace("]", "_")
         if os.path.exists(file_path):
             # load data from cache
+            data = list()
             with open(file_path, mode='r', encoding='utf-8') as file:
-                content = file.read()
-                return ast.literal_eval(content)
+                while True:
+                    record = file.readline()
+                    if record == '\n' or len(record) == 0:
+                        break
+                    data.append(json.loads(record))
+            return data
+            # with open(file_path, mode='r', encoding='utf-8') as file:
+            #     content = file.read()
+            #     return ast.literal_eval(content)
 
         else:
             # reformat empathetic_dialogues dataset
@@ -118,7 +127,11 @@ class EmpatheticDialoguesDataset(torch.utils.data.Dataset):
                     print(exc)
                     pass
             with open(file_path, mode='w', encoding='utf-8') as file:
-                file.write(str(data))
+                for record in data:
+                    json_str = json.dumps(record)
+                    file.write(json_str)
+                    file.write("\n")
+                # file.write(str(data))
 
             return data
 
@@ -257,12 +270,20 @@ class MELDDataset(torch.utils.data.Dataset):
         :param split: train/test/validation
         :return: dataset with new format
         """
-        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}"
+        file_path = f"{cls.CACHE_PATH}/{cls.DATASET_NAME}_{split}.json"
         if os.path.exists(file_path):
             # load data from cache
+            data = list()
             with open(file_path, mode='r', encoding='utf-8') as file:
-                content = file.read()
-                return ast.literal_eval(str(content))
+                while True:
+                    record = file.readline()
+                    if record == '\n' or len(record) == 0:
+                        break
+                    data.append(json.loads(record))
+            return data
+            # with open(file_path, mode='r', encoding='utf-8') as file:
+            #     content = file.read()
+            #     return ast.literal_eval(str(content))
 
         else:
             # reformat meld dataset
@@ -289,7 +310,10 @@ class MELDDataset(torch.utils.data.Dataset):
                     print(exc)
                     pass
             with open(file_path, mode='w', encoding='utf-8') as file:
-                file.write(str(data))
+                for record in data:
+                    json_str = json.dumps(record)
+                    file.write(json_str)
+                    file.write("\n")
 
             return data
 
@@ -406,12 +430,20 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
     def conv_process_chunk_management(self, dataset_dir: str,  split: str, add_knowledge: bool = True,
                                       add_examples: bool = True):
 
-        file_path = f"{self.CACHE_PATH}/{self.DATASET_NAME}_{split}"
+        file_path = f"{self.CACHE_PATH}/{self.DATASET_NAME}_{split}.json"
         if os.path.exists(file_path):
             # load data from cache
+            data = list()
             with open(file_path, mode='r', encoding='utf-8') as file:
-                content = file.read()
-                return ast.literal_eval(content)
+                while True:
+                    record = file.readline()
+                    if record == '\n' or len(record) == 0:
+                        break
+                    data.append(json.loads(record))
+            return data
+                # content = file.read()
+                # print('after read content')
+                # return ast.literal_eval(content)
 
         else:
             conv_num = int(len(pd.read_csv(f"{dataset_dir}/{split}/metadata.csv"))/2)
@@ -430,7 +462,11 @@ class BiMEmpDialoguesDataset(torch.utils.data.Dataset):
                     print(exc)
                     pass
             with open(file_path, mode='w', encoding='utf-8') as file:
-                file.write(str(data))
+                for record in data:
+                    json_str = json.dumps(record)
+                    file.write(json_str)
+                    file.write("\n")
+                # file.write(str(data))
 
             return data
 
