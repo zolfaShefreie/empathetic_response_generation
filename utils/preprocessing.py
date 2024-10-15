@@ -605,19 +605,59 @@ class ConversationTokenizer:
         self.gen_label_mask_key_name = gen_label_mask_key_name
         self.gen_label_token_type_key_name = gen_label_token_type_key_name
 
+    def __encode_context(self, text1, text2, special_tokens_num=4):
+        """
+
+        :param text1:
+        :param text2:
+        :param special_tokens_num: for roberta is equal to 4 because => <s>text1</s></s>text2</s>
+        :return:
+        """
+        tonkenized_1 = self.source_tokenizer.encode_plus(text1,
+                                                         add_special_tokens=False,
+                                                         padding=False,
+                                                         return_attention_mask=False,
+                                                         return_token_type_ids=False,
+                                                         truncation=False)['input_ids']
+
+        tonkenized_2 = self.source_tokenizer.encode_plus(text2,
+                                                         add_special_tokens=False,
+                                                         padding=False,
+                                                         return_attention_mask=False,
+                                                         return_token_type_ids=False,
+                                                         truncation=False)['input_ids']
+
+        decoded_text2 = self.source_tokenizer.decode(tonkenized_2[: self.source_max_len - special_tokens_num])
+        decoded_text1 = str()
+
+        if len(tonkenized_2) < self.source_max_len - special_tokens_num:
+            decoded_text1 = self.source_tokenizer.decode(tonkenized_1[- (self.source_max_len - special_tokens_num -
+                                                                         len(tonkenized_2)):])
+
+        return self.source_tokenizer.encode_plus(decoded_text1, decoded_text2,
+                                                 add_special_tokens=True,
+                                                 max_length=self.source_max_len,
+                                                 padding='max_length',
+                                                 return_attention_mask=True,
+                                                 return_token_type_ids=True,
+                                                 truncation=True)
+
     def __call__(self, sample):
         """
         warning make sure to apply ToNumpy before using this function
         :param sample: get context, last_utter and response (response is optional)
         :return:
         """
-        inputs = self.source_tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
-                                                   add_special_tokens=True,
-                                                   max_length=self.source_max_len,
-                                                   padding='max_length',
-                                                   return_attention_mask=True,
-                                                   return_token_type_ids=True,
-                                                   truncation=True)
+        # inputs = self.source_tokenizer.encode_plus(sample[self.history_key_name][0], sample[self.last_utter_key_name][0],
+        #                                            add_special_tokens=True,
+        #                                            max_length=self.source_max_len,
+        #                                            padding='max_length',
+        #                                            return_attention_mask=True,
+        #                                            return_token_type_ids=True,
+        #                                            truncation=True)
+
+        inputs = self.__encode_context(text1=sample[self.history_key_name][0],
+                                       text2=sample[self.last_utter_key_name][0])
 
         sample[self.context_ids_key_name] = inputs['input_ids']
         sample[self.context_mask_key_name] = inputs['attention_mask']
