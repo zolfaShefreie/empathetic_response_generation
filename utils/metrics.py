@@ -4,14 +4,12 @@ from collections import Counter
 import evaluate
 import numpy as np
 from sklearn.metrics import f1_score
-import os
-import json
 import torch
-from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
-from torch.utils.data.distributed import DistributedSampler
 from torch.nn import CrossEntropyLoss
-import math
 from transformers import AutoTokenizer, AutoModelWithLMHead
+
+from settings import EMPATHY_CLASSIFIER_MODELS_PATH
+from utils.models import T5EncoderClassifier
 
 
 class Metrics:
@@ -158,7 +156,57 @@ class Metrics:
 
 
 class EmpathyEvaluation:
-    pass
+    
+    def __init__(self):
+        self.empathy_classifier_model1 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
+        self.empathy_classifier_model1.load_state_dict(
+            torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600015/model.pt",
+                       map_location=torch.device('cpu') if not torch.cuda.is_available()
+                       else torch.device("cuda")))
+        for param in self.empathy_classifier_model1.parameters():
+            param.requires_grad = False
+
+        self.empathy_classifier_model2 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
+        self.empathy_classifier_model2.load_state_dict(
+            torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619600805/model.pt",
+                       map_location=torch.device(
+                           'cpu') if not torch.cuda.is_available()
+                       else torch.device("cuda")))
+        for param in self.empathy_classifier_model2.parameters():
+            param.requires_grad = False
+
+        self.empathy_classifier_model3 = T5EncoderClassifier(size="base",
+                                                             base_context_encoder_name="roberta-base",
+                                                             base_target_encoder_name='microsoft/DialoGPT-small',
+                                                             num_labels=2, strategy=0)
+        self.empathy_classifier_model3.load_state_dict(
+            torch.load(f"{EMPATHY_CLASSIFIER_MODELS_PATH}/saved/empathy/1619601340/model.pt",
+                       map_location=torch.device(
+                           'cpu') if not torch.cuda.is_available()
+                       else torch.device("cuda")))
+        for param in self.empathy_classifier_model3.parameters():
+            param.requires_grad = False
+
+    def evaluate(self, history_conversation: list, response: str):
+        logits = self.empathy_classifier_model1(context=[' '.join(history_conversation)], response=[response])
+        empathy_label_1 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+
+        logits = self.empathy_classifier_model2(context=[' '.join(history_conversation)], response=[response])
+        empathy_label_2 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+
+        logits = self.empathy_classifier_model3(context=[' '.join(history_conversation)], response=[response])
+        empathy_label_3 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+
+        return {'empathy_label_1': empathy_label_1,
+                'empathy_label_2': empathy_label_2,
+                'empathy_label_3': empathy_label_3,
+                'empathy': empathy_label_1 == 1 or empathy_label_2 == 1 or empathy_label_3 == 1}
 
 
 class FedMetric:
