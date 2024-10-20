@@ -156,7 +156,7 @@ class Metrics:
 
 
 class EmpathyEvaluation:
-    
+
     def __init__(self):
         self.empathy_classifier_model1 = T5EncoderClassifier(size="base",
                                                              base_context_encoder_name="roberta-base",
@@ -463,3 +463,57 @@ class FedMetric:
 
 class DynaEvalMetric:
     pass
+
+
+class ExtraMetricsManagement:
+
+    @classmethod
+    def run_empathy_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
+        empathy_metric = EmpathyEvaluation()
+        result_plus_data = list()
+        empathy_present = 0
+        for record in test_data:
+            empathy_result = empathy_metric.evaluate(history_conversation=record[history_key_name],
+                                                     response=record[generated_res_key_name])
+            result_plus_data.append({**record, **empathy_result})
+
+            if empathy_result['empathy']:
+                empathy_present += 1
+        return result_plus_data, {'empathy_present': empathy_present/len(test_data)}
+
+    @classmethod
+    def run_fed_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
+        fed_metric = FedMetric()
+        result_plus_data = list()
+        metrics = dict()
+        for record in test_data:
+            fed_result = fed_metric.evaluate(history_conversation=record[history_key_name],
+                                             response=record[generated_res_key_name])
+            result_plus_data.append({**record, **fed_result})
+
+            for key, value in fed_result.items():
+                metrics[key] = metrics.get(key, 0) + value
+
+        return result_plus_data, {key: value/len(test_data) for key, value in metrics.items()}
+
+    @classmethod
+    def compute(cls, test_data, history_key_name, label_key_name, generated_res_key_name, include_fed=True,
+                include_empathy=True, include_dynaeval=True):
+        metric_result = dict()
+        if include_empathy:
+            test_data, metrics = cls.run_empathy_metric(test_data=test_data, history_key_name=history_key_name,
+                                                        label_key_name=label_key_name,
+                                                        generated_res_key_name=generated_res_key_name)
+            metric_result.update(metrics)
+
+        if include_fed:
+            test_data, metrics = cls.run_fed_metric(test_data=test_data, history_key_name=history_key_name,
+                                                    label_key_name=label_key_name,
+                                                    generated_res_key_name=generated_res_key_name)
+            metric_result.update(metrics)
+
+        if include_dynaeval:
+            pass
+
+        return test_data, metric_result
+
