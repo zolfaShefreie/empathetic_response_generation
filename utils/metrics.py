@@ -1,5 +1,5 @@
 import enum
-from transformers import EvalPrediction
+from transformers import EvalPrediction, RobertaModel, RobertaTokenizer
 from collections import Counter
 import evaluate
 import numpy as np
@@ -8,7 +8,8 @@ import torch
 from torch.nn import CrossEntropyLoss
 from transformers import AutoTokenizer, AutoModelWithLMHead
 
-from settings import EMPATHY_CLASSIFIER_MODELS_PATH
+from settings import EMPATHY_CLASSIFIER_MODELS_PATH, DYNAEVAL_MODEL_PATH, DYNAEVAL_ROBERTA_DIR
+from utils import dgcn
 from utils.models import T5EncoderClassifier
 
 
@@ -462,7 +463,72 @@ class FedMetric:
 
 
 class DynaEvalMetric:
-    pass
+
+    class Args:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        batch_size = 1
+        learning_rate = 0.002
+        weight_decay = 1e-8
+        max_grad_value = -1
+        drop_rate = 0.5
+        wp = 4
+        wf = 4
+        n_speakers = 2
+        hidden_size = 100
+        rnn = "lstm"
+        class_weight = "store_true"
+        sentence_dim = 768
+        max_seq_len = 50
+        max_dialogue_len = 700
+        seed = 24
+
+    def __init__(self):
+        self.args = DynaEvalMetric.Args()
+        model_file = DYNAEVAL_MODEL_PATH
+        self.model = dgcn.DynaEval(self.args).to(self.args.device)
+
+        ckpt = torch.load(model_file, map_location=torch.device(self.args.device))
+        best_dev_f1 = ckpt["best_dev_acc"]
+        best_epoch = ckpt["best_epoch"]
+        best_state = ckpt["best_state"]
+        self.model.load_state_dict(best_state, strict=False)
+        self.model.eval()
+
+        self.sentence_model = RobertaModel.from_pretrained(DYNAEVAL_ROBERTA_DIR).to(self.args.device)
+        self.tokenizer = RobertaTokenizer.from_pretrained(DYNAEVAL_ROBERTA_DIR)
+
+    def preprocess(self, history_conversation: list, response: str, idx=0):
+        utts_1 = history_conversation + [response]
+        utts_2 = history_conversation + [response]
+        spk_1_list = ['A' if j % 2 == 0 else 'B' for j in range(len(utts_1))]
+        spk_2_list = ['A' if j % 2 == 0 else 'B' for j in range(len(utts_2))]
+
+        sample = dgcn.Sample(vid="eval_{}".format(idx),
+                             speaker_1=spk_1_list,
+                             speaker_2=spk_2_list,
+                             text_1=utts_1,
+                             text_2=utts_2,
+                             label=1)
+        return sample
+
+    def evaluate(self, history_conversation: list, response: str):
+        evalset = dgcn.Dataset(samples=[self.preprocess(history_conversation=history_conversation, response=response)],
+                            model=self.sentence_model,
+                            tokenizer=self.tokenizer,
+                            args=self.args)
+
+        with torch.no_grad():
+            preds = []
+            for idx in range(len(evalset)):
+                data = evalset[idx]
+                for k, v in data.items():
+                    data[k] = v.to(self.args.device)
+                rst = self.model(data)
+                scores = rst[1]
+                preds.append(scores.detach().to("cpu"))
+
+            preds = torch.nn.functional.sigmoid(torch.cat(preds, dim=-1)).numpy()
+            return {'dynaeval_score': preds[0]}
 
 
 class ExtraMetricsManagement:
@@ -497,6 +563,22 @@ class ExtraMetricsManagement:
         return result_plus_data, {key: value/len(test_data) for key, value in metrics.items()}
 
     @classmethod
+    def run_dynaeval_metrics(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
+        dynaeval = DynaEvalMetric()
+        result_plus_data = list()
+        metrics = dict()
+        for record in test_data:
+            dunaeval_result = dynaeval.evaluate(history_conversation=record[history_key_name],
+                                             response=record[generated_res_key_name])
+            result_plus_data.append({**record, **dunaeval_result})
+
+            for key, value in dunaeval_result.items():
+                metrics[key] = metrics.get(key, 0) + value
+
+        return result_plus_data, {key: value / len(test_data) for key, value in metrics.items()}
+
+
+    @classmethod
     def compute(cls, test_data, history_key_name, label_key_name, generated_res_key_name, include_fed=True,
                 include_empathy=True, include_dynaeval=True):
         metric_result = dict()
@@ -513,7 +595,10 @@ class ExtraMetricsManagement:
             metric_result.update(metrics)
 
         if include_dynaeval:
-            pass
+            test_data, metrics = cls.run_dynaeval_metrics(test_data=test_data, history_key_name=history_key_name,
+                                                          label_key_name=label_key_name,
+                                                          generated_res_key_name=generated_res_key_name)
+            metric_result.update(metrics)
 
         return test_data, metric_result
 
