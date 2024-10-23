@@ -1,11 +1,10 @@
 import json
+import os
+import ast
 
 from model_data_process.dataset import EmpatheticDialoguesDataset, BiMEmpDialoguesDataset
 from settings import BMEDIALOGUES_PATH
 from utils.interface import BaseInterface
-
-import os
-import ast
 
 from utils.metrics import ExtraMetricsManagement
 
@@ -74,7 +73,8 @@ class EvaluateTextInterface(BaseInterface):
         return combined_data, result['metric']
 
     def save(self, data_plus, metrics):
-        file_path = f"{os.path.dirname(self.result_path)}/result_plus.json"
+        file_name, _ = os.path.splitext(os.path.basename(self.result_path))
+        file_path = f"{os.path.dirname(self.result_path)}/extra_{file_name}.json"
         with open(file_path, mode='w', encoding='utf-8') as file:
             json_str = json.dumps(metrics)
             file.write(json_str)

@@ -7,6 +7,7 @@ from sklearn.metrics import f1_score
 import torch
 from torch.nn import CrossEntropyLoss
 from transformers import AutoTokenizer, AutoModelWithLMHead
+from tqdm import tqdm
 
 from settings import EMPATHY_CLASSIFIER_MODELS_PATH, DYNAEVAL_MODEL_PATH, DYNAEVAL_ROBERTA_DIR
 from utils import dgcn
@@ -196,13 +197,13 @@ class EmpathyEvaluation:
 
     def evaluate(self, history_conversation: list, response: str):
         logits = self.empathy_classifier_model1(context=[' '.join(history_conversation)], response=[response])
-        empathy_label_1 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+        empathy_label_1 = torch.argmax(torch.nn.functional.softmax(logits), dim=-1).tolist()[0]
 
         logits = self.empathy_classifier_model2(context=[' '.join(history_conversation)], response=[response])
-        empathy_label_2 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+        empathy_label_2 = torch.argmax(torch.nn.functional.softmax(logits), dim=-1).tolist()[0]
 
         logits = self.empathy_classifier_model3(context=[' '.join(history_conversation)], response=[response])
-        empathy_label_3 = torch.argmax(torch.nn.functional.softmax(logits))[0]
+        empathy_label_3 = torch.argmax(torch.nn.functional.softmax(logits), dim=-1).tolist()[0]
 
         return {'empathy_label_1': empathy_label_1,
                 'empathy_label_2': empathy_label_2,
@@ -521,13 +522,12 @@ class DynaEvalMetric:
             preds = []
             for idx in range(len(evalset)):
                 data = evalset[idx]
-                for k, v in data.items():
-                    data[k] = v.to(self.args.device)
+                data = {k: v.to(self.args.device) if 'len' not in k else v for k, v in data.items()}
                 rst = self.model(data)
                 scores = rst[1]
                 preds.append(scores.detach().to("cpu"))
 
-            preds = torch.nn.functional.sigmoid(torch.cat(preds, dim=-1)).numpy()
+            preds = torch.nn.functional.sigmoid(torch.cat(preds, dim=-1)).tolist()
             return {'dynaeval_score': preds[0]}
 
 
@@ -538,7 +538,7 @@ class ExtraMetricsManagement:
         empathy_metric = EmpathyEvaluation()
         result_plus_data = list()
         empathy_present = 0
-        for record in test_data:
+        for record in tqdm(test_data, desc='running empathy metrics'):
             empathy_result = empathy_metric.evaluate(history_conversation=record[history_key_name],
                                                      response=record[generated_res_key_name])
             result_plus_data.append({**record, **empathy_result})
@@ -552,7 +552,7 @@ class ExtraMetricsManagement:
         fed_metric = FedMetric()
         result_plus_data = list()
         metrics = dict()
-        for record in test_data:
+        for record in tqdm(test_data, desc='running FED'):
             fed_result = fed_metric.evaluate(history_conversation=record[history_key_name],
                                              response=record[generated_res_key_name])
             result_plus_data.append({**record, **fed_result})
@@ -567,7 +567,7 @@ class ExtraMetricsManagement:
         dynaeval = DynaEvalMetric()
         result_plus_data = list()
         metrics = dict()
-        for record in test_data:
+        for record in tqdm(test_data, desc='running dynaEval'):
             dunaeval_result = dynaeval.evaluate(history_conversation=record[history_key_name],
                                              response=record[generated_res_key_name])
             result_plus_data.append({**record, **dunaeval_result})
