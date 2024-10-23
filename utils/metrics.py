@@ -296,7 +296,7 @@ class FedMetric:
         :param response:
         :return:
         """
-        return '<|endoftext|>' + '<|endoftext|>'.join(history_conversation) + '<|endoftext|>' + response
+        return '<|endoftext|> ' + ' <|endoftext|> '.join(history_conversation) + ' <|endoftext|> ' + response
 
     def evaluate(self, history_conversation: list, response: str, truncate_type='normal'):
         """
