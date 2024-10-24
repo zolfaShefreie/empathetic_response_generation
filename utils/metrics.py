@@ -210,6 +210,28 @@ class EmpathyEvaluation:
                 'empathy_label_3': empathy_label_3,
                 'empathy': empathy_label_1 == 1 or empathy_label_2 == 1 or empathy_label_3 == 1}
 
+    def evaluate_batch(self, history_conversations: list, responses: list):
+        logits = self.empathy_classifier_model1(context=[' '.join(each) for each in history_conversations],
+                                                response=responses)
+        empathy_label_1 = torch.argmax(torch.nn.functional.softmax(logits, dim=-1), dim=-1).tolist()
+
+        logits = self.empathy_classifier_model2(context=[' '.join(each) for each in history_conversations],
+                                                response=responses)
+        empathy_label_2 = torch.argmax(torch.nn.functional.softmax(logits, dim=-1), dim=-1).tolist()
+
+        logits = self.empathy_classifier_model3(context=[' '.join(each) for each in history_conversations],
+                                                response=responses)
+        empathy_label_3 = torch.argmax(torch.nn.functional.softmax(logits, dim=-1), dim=-1).tolist()
+
+        empathy = list()
+        for idx in range(len(empathy_label_1)):
+            empathy.append(empathy_label_1[idx] == 1 or empathy_label_2[idx] == 1 or empathy_label_3[idx] == 1)
+
+        return {'empathy_label_1': empathy_label_1,
+                'empathy_label_2': empathy_label_2,
+                'empathy_label_3': empathy_label_3,
+                'empathy': empathy}
+
 
 class FedMetric:
     """source of code https://github.com/exe1023/DialEvalMetrics/blob/main/usr_fed/fed/fed.py"""
@@ -298,12 +320,13 @@ class FedMetric:
         """
         return '<|endoftext|> ' + ' <|endoftext|> '.join(history_conversation) + ' <|endoftext|> ' + response
 
-    def evaluate(self, history_conversation: list, response: str, truncate_type='normal'):
+    def evaluate(self, history_conversation: list, response: str, max_batch_size=16, max_seq_length=400):
         """
         compute fed metric
         :param history_conversation:
         :param response:
-        :param truncate_type:
+        :param max_batch_size:
+        :param max_seq_length:
         :return:
         """
         conversation = self.prepare_inputs(history_conversation=history_conversation,
@@ -351,18 +374,6 @@ class FedMetric:
                 "negative": ["Is that real English?", "I'm so confused right now!", "That makes no sense!"]
             },
         }
-
-        if truncate_type == 'no_truncate':
-            max_batch_size = 1
-            max_seq_length = 1024
-
-        elif truncate_type == 'normal':
-            max_batch_size = 2
-            max_seq_length = 128
-
-        elif truncate_type == 'more':
-            max_batch_size = 4
-            max_seq_length = 64
 
         texts = list()
         for metric, utts in turn_level_utts.items():
@@ -483,8 +494,9 @@ class DynaEvalMetric:
         max_dialogue_len = 700
         seed = 24
 
-    def __init__(self):
+    def __init__(self, batch_size: int):
         self.args = DynaEvalMetric.Args()
+        self.args.batch_size = batch_size
         model_file = DYNAEVAL_MODEL_PATH
         self.model = dgcn.DynaEval(self.args).to(self.args.device)
 
@@ -530,22 +542,63 @@ class DynaEvalMetric:
             preds = torch.nn.functional.sigmoid(torch.cat(preds, dim=-1)).tolist()
             return {'dynaeval_score': preds[0]}
 
+    def evaluate_batch(self, history_conversations: list, responses: list):
+        samples = [self.preprocess(history_conversation=history_conversations[idx], response=responses[idx])
+                   for idx in range(len(responses))]
+        evalset = dgcn.Dataset(samples=samples,
+                               model=self.sentence_model,
+                               tokenizer=self.tokenizer,
+                               args=self.args)
+
+        with torch.no_grad():
+            preds = []
+            for idx in range(len(evalset)):
+                data = evalset[idx]
+                data = {k: v.to(self.args.device) if 'len' not in k else v for k, v in data.items()}
+                rst = self.model(data)
+                scores = rst[1]
+                preds.append(scores.detach().to("cpu"))
+
+            preds = torch.nn.functional.sigmoid(torch.cat(preds, dim=-1)).tolist()
+            return {'dynaeval_score': preds}
+
 
 class ExtraMetricsManagement:
+
+    batch_size = 16
 
     @classmethod
     def run_empathy_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
         empathy_metric = EmpathyEvaluation()
         result_plus_data = list()
         empathy_present = 0
-        for record in tqdm(test_data, desc='running empathy metrics'):
-            empathy_result = empathy_metric.evaluate(history_conversation=record[history_key_name],
-                                                     response=record[generated_res_key_name])
-            result_plus_data.append({**record, **empathy_result})
+        batch_size = cls.batch_size
+        for i in tqdm(range(int(len(test_data)/batch_size)+1), desc='running empathy metrics'):
+            history_conversations = [record[history_key_name] for record in test_data[i*batch_size: (i+1)*batch_size]]
+            responses = [record[generated_res_key_name] for record in test_data[i*batch_size: (i+1)*batch_size]]
 
-            if empathy_result['empathy']:
-                empathy_present += 1
-        return result_plus_data, {'empathy_present': empathy_present/len(test_data)}
+            empathy_result = empathy_metric.evaluate_batch(history_conversations=history_conversations,
+                                                           responses=responses)
+            for index, record in enumerate(test_data[i*batch_size: (i+1)*batch_size]):
+                empathy_result_record = dict()
+                for k, v in empathy_result.items():
+                    empathy_result_record[k] = v[index]
+                result_plus_data.append({**record, **empathy_result_record})
+
+            for each in empathy_result['empathy']:
+                if each:
+                    empathy_present += 1
+
+        return result_plus_data, {'empathy_present': empathy_present / len(test_data)}
+
+        # for record in tqdm(test_data, desc='running empathy metrics'):
+        #     empathy_result = empathy_metric.evaluate(history_conversation=record[history_key_name],
+        #                                              response=record[generated_res_key_name])
+        #     result_plus_data.append({**record, **empathy_result})
+        #
+        #     if empathy_result['empathy']:
+        #         empathy_present += 1
+        # return result_plus_data, {'empathy_present': empathy_present/len(test_data)}
 
     @classmethod
     def run_fed_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
@@ -554,7 +607,7 @@ class ExtraMetricsManagement:
         metrics = dict()
         for record in tqdm(test_data, desc='running FED'):
             fed_result = fed_metric.evaluate(history_conversation=record[history_key_name],
-                                             response=record[generated_res_key_name])
+                                             response=record[generated_res_key_name], max_batch_size=cls.batch_size)
             result_plus_data.append({**record, **fed_result})
 
             for key, value in fed_result.items():
@@ -564,19 +617,33 @@ class ExtraMetricsManagement:
 
     @classmethod
     def run_dynaeval_metrics(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
-        dynaeval = DynaEvalMetric()
+        dynaeval = DynaEvalMetric(batch_size=8)
         result_plus_data = list()
         metrics = dict()
-        for record in tqdm(test_data, desc='running dynaEval'):
-            dunaeval_result = dynaeval.evaluate(history_conversation=record[history_key_name],
-                                             response=record[generated_res_key_name])
-            result_plus_data.append({**record, **dunaeval_result})
+        batch_size = cls.batch_size
+        for i in tqdm(range(int(len(test_data) / batch_size) + 1), desc='running empathy metrics'):
+            history_conversations = [record[history_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
+            responses = [record[generated_res_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
 
-            for key, value in dunaeval_result.items():
-                metrics[key] = metrics.get(key, 0) + value
+            dunaeval_result = dynaeval.evaluate_batch(history_conversations=history_conversations,
+                                                      responses=responses)
+            for index, record in enumerate(test_data[i * batch_size: (i + 1) * batch_size]):
+                dynaeval_result_record = dict()
+                for k, v in dunaeval_result.items():
+                    dynaeval_result_record[k] = v[index]
+                    metrics[k] = metrics.get(k, 0) + v[index]
+                result_plus_data.append({**record, **dynaeval_result_record})
 
         return result_plus_data, {key: value / len(test_data) for key, value in metrics.items()}
 
+        # for record in tqdm(test_data, desc='running dynaEval'):
+        #     dunaeval_result = dynaeval.evaluate(history_conversation=record[history_key_name],
+        #                                      response=record[generated_res_key_name])
+        #     result_plus_data.append({**record, **dunaeval_result})
+        #
+        #     for key, value in dunaeval_result.items():
+        #         metrics[key] = metrics.get(key, 0) + value
+        # return result_plus_data, {key: value / len(test_data) for key, value in metrics.items()}
 
     @classmethod
     def compute(cls, test_data, history_key_name, label_key_name, generated_res_key_name, include_fed=True,

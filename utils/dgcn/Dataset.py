@@ -31,7 +31,7 @@ class Dataset:
     def raw_batch(self, index):
         assert index < self.num_batches, "batch_idx %d > %d" % (index, self.num_batches)
         batch = self.samples[index * self.batch_size: (index + 1) * self.batch_size]
-        self.in_batch_shuffle(batch)
+        # self.in_batch_shuffle(batch)
         return batch
 
     def padding(self, samples):
