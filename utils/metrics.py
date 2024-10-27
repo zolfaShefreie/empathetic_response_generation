@@ -565,10 +565,8 @@ class DynaEvalMetric:
 
 class ExtraMetricsManagement:
 
-    batch_size = 16
-
     @classmethod
-    def run_empathy_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
+    def run_empathy_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name, batch_size=8):
         empathy_metric = EmpathyEvaluation()
         result_plus_data = list()
         empathy_present = 0
@@ -601,13 +599,13 @@ class ExtraMetricsManagement:
         # return result_plus_data, {'empathy_present': empathy_present/len(test_data)}
 
     @classmethod
-    def run_fed_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
+    def run_fed_metric(cls, test_data, history_key_name, label_key_name, generated_res_key_name, batch_size=8):
         fed_metric = FedMetric()
         result_plus_data = list()
         metrics = dict()
         for record in tqdm(test_data, desc='running FED'):
             fed_result = fed_metric.evaluate(history_conversation=record[history_key_name],
-                                             response=record[generated_res_key_name], max_batch_size=cls.batch_size)
+                                             response=record[generated_res_key_name], max_batch_size=batch_size)
             result_plus_data.append({**record, **fed_result})
 
             for key, value in fed_result.items():
@@ -616,11 +614,11 @@ class ExtraMetricsManagement:
         return result_plus_data, {key: value/len(test_data) for key, value in metrics.items()}
 
     @classmethod
-    def run_dynaeval_metrics(cls, test_data, history_key_name, label_key_name, generated_res_key_name):
-        dynaeval = DynaEvalMetric(batch_size=8)
+    def run_dynaeval_metrics(cls, test_data, history_key_name, label_key_name, generated_res_key_name, batch_size=8):
+        dynaeval = DynaEvalMetric(batch_size=batch_size)
         result_plus_data = list()
         metrics = dict()
-        batch_size = cls.batch_size
+        batch_size = batch_size
         for i in tqdm(range(int(len(test_data) / batch_size) + 1), desc='running empathy metrics'):
             history_conversations = [record[history_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
             responses = [record[generated_res_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
@@ -647,24 +645,27 @@ class ExtraMetricsManagement:
 
     @classmethod
     def compute(cls, test_data, history_key_name, label_key_name, generated_res_key_name, include_fed=True,
-                include_empathy=True, include_dynaeval=True):
+                include_empathy=True, include_dynaeval=True, batch_size=16):
         metric_result = dict()
         if include_empathy:
             test_data, metrics = cls.run_empathy_metric(test_data=test_data, history_key_name=history_key_name,
                                                         label_key_name=label_key_name,
-                                                        generated_res_key_name=generated_res_key_name)
+                                                        generated_res_key_name=generated_res_key_name,
+                                                        batch_size=batch_size)
             metric_result.update(metrics)
 
         if include_fed:
             test_data, metrics = cls.run_fed_metric(test_data=test_data, history_key_name=history_key_name,
                                                     label_key_name=label_key_name,
-                                                    generated_res_key_name=generated_res_key_name)
+                                                    generated_res_key_name=generated_res_key_name,
+                                                    batch_size=batch_size)
             metric_result.update(metrics)
 
         if include_dynaeval:
             test_data, metrics = cls.run_dynaeval_metrics(test_data=test_data, history_key_name=history_key_name,
                                                           label_key_name=label_key_name,
-                                                          generated_res_key_name=generated_res_key_name)
+                                                          generated_res_key_name=generated_res_key_name,
+                                                          batch_size=batch_size)
             metric_result.update(metrics)
 
         return test_data, metric_result

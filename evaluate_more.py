@@ -26,7 +26,14 @@ class EvaluateTextInterface(BaseInterface):
             'choices': ['EmpatheticDialogues', 'BiMEmpDialogues'],
             'required': False,
             'default': 'BiMEmpDialogues'
-        }
+        },
+
+        'batch_size': {
+            'help': 'The batch size for evaluation.',
+            'type': int,
+            'required': False,
+            'default': 16
+        },
 
     }
 
@@ -93,7 +100,8 @@ class EvaluateTextInterface(BaseInterface):
         test_data_plus, metrics_extra = ExtraMetricsManagement.compute(test_data=test_data,
                                                                        history_key_name='history',
                                                                        label_key_name='labels',
-                                                                       generated_res_key_name='generated_response')
+                                                                       generated_res_key_name='generated_response',
+                                                                       batch_size=self.batch_size)
         self.save(data_plus=test_data_plus, metrics={**metrics_p, **metrics_extra})
 
 
