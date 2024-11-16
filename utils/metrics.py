@@ -88,11 +88,12 @@ class Metrics:
                 'inter_dist1': inter_dist1,
                 'inter_dist2': inter_dist2}
 
-    def compute_text_generator_metric(self, pred, labels) -> dict:
+    def compute_text_generator_metric(self, pred, labels, need_preprocessing: bool = True) -> dict:
         """
         compute some metrics for text generator task
         :param pred:
         :param labels:
+        :param need_preprocessing:
         :return:
         """
         result = dict()
@@ -101,11 +102,15 @@ class Metrics:
         # result.update(self.ACCURACY.compute(references=labels_ids, predictions=pred_ids))
 
         # convert ids to token ids version
-        pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
-        copy_labels = np.copy(labels)
-        copy_labels[copy_labels == -100] = self.tokenizer.pad_token_id
-        label_str = self.tokenizer.batch_decode(copy_labels, skip_special_tokens=True)
-        pred_str = ['.' if not each else each for each in pred_str]
+        if need_preprocessing:
+            pred_str = self.tokenizer.batch_decode(pred, skip_special_tokens=True)
+            copy_labels = np.copy(labels)
+            copy_labels[copy_labels == -100] = self.tokenizer.pad_token_id
+            label_str = self.tokenizer.batch_decode(copy_labels, skip_special_tokens=True)
+            pred_str = ['.' if not each else each for each in pred_str]
+        else:
+            pred_str = pred
+            label_str = labels
 
         # metrics using token version
         result.update(self.ROUGE.compute(predictions=pred_str, references=label_str))
@@ -116,18 +121,20 @@ class Metrics:
 
         return result
 
-    def compute_classifier_metric(self, pred, labels) -> dict:
+    def compute_classifier_metric(self, pred, labels, need_preprocessing: bool = True) -> dict:
         """
         compute some metrics for text classifier task
         :param pred:
         :param labels:
+        :param need_preprocessing:
         :return:
         """
         def after_result(z):
             result = 1/(1 + np.exp(-z))
             return np.argmax(result, axis=-1)
 
-        pred = after_result(pred)
+        if need_preprocessing:
+            pred = after_result(pred)
         result = dict()
         result['f1'] = f1_score(labels, pred, average='micro')
         result.update(self.ACCURACY.compute(references=labels, predictions=pred))
