@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 
-import utils.dgcn as dgcn
+from utils.dgcn.utils import get_logger
 
-log = dgcn.utils.get_logger()
+log = get_logger()
 
 
 def batch_graphify(features, lengths, speaker_tensor, wp, wf, edge_type_to_idx, att_model, device):

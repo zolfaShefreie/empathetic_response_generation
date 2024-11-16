@@ -6,11 +6,11 @@ from .EdgeAtt import EdgeAtt
 from .GCN import GCN
 from .Classifier import Scorer
 from .functions import batch_graphify
-import utils.dgcn as dgcn
+from utils.dgcn.utils import get_logger
 
 import random
 
-log = dgcn.utils.get_logger()
+log = get_logger()
 
 
 class DynaEval(nn.Module):

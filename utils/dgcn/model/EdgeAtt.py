@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import utils.dgcn as dgcn
+from utils.dgcn.utils import get_logger
 
-log = dgcn.utils.get_logger()
+log = get_logger()
 
 
 class EdgeAtt(nn.Module):

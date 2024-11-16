@@ -1,4 +1,4 @@
-import dgcn.utils
+import utils.dgcn.utils
 from .Sample import Sample
 from .Dataset import Dataset
 from .Coach import Coach
