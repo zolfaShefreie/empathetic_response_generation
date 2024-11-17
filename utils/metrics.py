@@ -577,7 +577,6 @@ class ExtraMetricsManagement:
         empathy_metric = EmpathyEvaluation()
         result_plus_data = list()
         empathy_present = 0
-        batch_size = cls.batch_size
         for i in tqdm(range(int(len(test_data)/batch_size)+1), desc='running empathy metrics'):
             history_conversations = [record[history_key_name] for record in test_data[i*batch_size: (i+1)*batch_size]]
             responses = [record[generated_res_key_name] for record in test_data[i*batch_size: (i+1)*batch_size]]
