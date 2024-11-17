@@ -625,7 +625,7 @@ class ExtraMetricsManagement:
         result_plus_data = list()
         metrics = dict()
         batch_size = batch_size
-        for i in tqdm(range(int(len(test_data) / batch_size) + 1), desc='running empathy metrics'):
+        for i in tqdm(range(int(len(test_data) / batch_size) + 1), desc='running dynaEval'):
             history_conversations = [record[history_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
             responses = [record[generated_res_key_name] for record in test_data[i * batch_size: (i + 1) * batch_size]]
 
