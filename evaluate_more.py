@@ -205,8 +205,8 @@ class EvaluateTextInterface(BaseInterface):
 
         :return:
         """
-        regex_pattern = r"((Emotion): (.*)\n?)((Pred Emotions): (.*)\n?)?((x_intent):(\[.*\])\n?)?((x_need):" \
-                        r"(\[.*\])\n?)?((x_want):(\[.*\])\n?)?((x_effect):(\[.*\])\n?)?((x_react):(\[.*\])\n?)?" \
+        regex_pattern = r"((Emotion): (.*)\n?)((Pred Emotions): (.*)\n?)?((c_intent):(\[.*\])\n?)?((c_need):" \
+                        r"(\[.*\])\n?)?((c_want):(\[.*\])\n?)?((c_effect):(\[.*\])\n?)?((c_react):(\[.*\])\n?)?" \
                         r"((Context):(\[.*\])\n?)((Beam):(.*)\n?)?((Greedy):(.*)\n?)((Ref):(.*)\n?)"
         key_names = ['Emotion', 'Pred Emotions', 'x_need', 'x_intent', 'x_want', 'x_effect', 'x_react', 'Context',
                      'Beam', 'Greedy', 'Ref']
