@@ -1,0 +1,16 @@
+{
+  "conversation": [
+    {
+      "utterance": "i hate being alone",
+      "audio_file_path": null
+    },
+    {
+      "utterance": "same here",
+      "audio_file_path": null
+    },
+    {
+      "utterance": "sometimes it's a hate-love relationship",
+      "audio_file_path": "./utter_3.wav"
+    }
+  ]
+}
