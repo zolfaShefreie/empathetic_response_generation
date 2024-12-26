@@ -236,6 +236,14 @@ class MultiTaskModel(PreTrainedModel, abc.ABC):
 
         return output_obj
 
+    def _prepare_encoder_decoder_kwargs_for_generation(self, inputs_tensor: torch.Tensor,
+                                                       model_kwargs, model_input_name: Optional[str] = None):
+        if self.get_generative_task_id() is not None:
+            return self.TASK_CONFIG[self.get_generative_task_id()]._prepare_encoder_decoder_kwargs_for_generation(
+                inputs_tensor=inputs_tensor,
+                model_kwargs=model_kwargs,
+                model_input_name=model_input_name,)
+
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """
 

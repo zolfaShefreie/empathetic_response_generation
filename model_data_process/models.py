@@ -346,6 +346,96 @@ class TextualResponseGenerator(EncoderDecoderModel):
         for param in self.empathy_classifier_model3.parameters():
             param.requires_grad = False
 
+    def get_encoder_output(self,
+                           input_ids: Optional[torch.LongTensor] = None,
+                           attention_mask: Optional[torch.FloatTensor] = None,
+                           inputs_embeds: Optional[torch.FloatTensor] = None,
+                           output_attentions: Optional[bool] = None,
+                           output_hidden_states: Optional[bool] = None,
+                           react_rel_input_ids: Optional[torch.LongTensor] = None,
+                           react_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                           react_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                           social_rel_input_ids: Optional[torch.LongTensor] = None,
+                           social_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                           social_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                           event_rel_input_ids: Optional[torch.LongTensor] = None,
+                           event_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                           event_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                           entity_rel_input_ids: Optional[torch.LongTensor] = None,
+                           entity_rel_attention_mask: Optional[torch.FloatTensor] = None,
+                           entity_rel_token_type_ids: Optional[torch.FloatTensor] = None,
+                           example_0_input_ids: Optional[torch.LongTensor] = None,
+                           example_0_attention_mask: Optional[torch.FloatTensor] = None,
+                           example_0_token_type_ids: Optional[torch.FloatTensor] = None,
+                           example_1_input_ids: Optional[torch.LongTensor] = None,
+                           example_1_attention_mask: Optional[torch.FloatTensor] = None,
+                           example_1_token_type_ids: Optional[torch.FloatTensor] = None,
+                           example_2_input_ids: Optional[torch.LongTensor] = None,
+                           example_2_attention_mask: Optional[torch.FloatTensor] = None,
+                           example_2_token_type_ids: Optional[torch.FloatTensor] = None,
+                           example_3_input_ids: Optional[torch.LongTensor] = None,
+                           example_3_attention_mask: Optional[torch.FloatTensor] = None,
+                           example_3_token_type_ids: Optional[torch.FloatTensor] = None,
+                           example_4_input_ids: Optional[torch.LongTensor] = None,
+                           example_4_attention_mask: Optional[torch.FloatTensor] = None,
+                           example_4_token_type_ids: Optional[torch.FloatTensor] = None,
+                           **kwargs):
+
+        kwargs_encoder = {argument: value for argument, value in kwargs.items() if not argument.startswith("decoder_")}
+        encoder_outputs = self.encode_context(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=True,
+                **kwargs_encoder
+            )
+        last_hidden_state = encoder_outputs.last_hidden_state
+
+        if self.config.include_knowledge:
+            encoded_knowledge = self.knowledge_encoder(
+                    react_rel_input_ids=react_rel_input_ids,
+                    react_rel_attention_mask=react_rel_attention_mask,
+                    react_rel_token_type_ids=react_rel_token_type_ids,
+                    social_rel_input_ids=social_rel_input_ids,
+                    social_rel_attention_mask=social_rel_attention_mask,
+                    social_rel_token_type_ids=social_rel_token_type_ids,
+                    event_rel_input_ids=event_rel_input_ids,
+                    event_rel_attention_mask=event_rel_attention_mask,
+                    event_rel_token_type_ids=event_rel_token_type_ids,
+                    entity_rel_input_ids=entity_rel_input_ids,
+                    entity_rel_attention_mask=entity_rel_attention_mask,
+                    entity_rel_token_type_ids=entity_rel_token_type_ids
+                )
+
+            last_hidden_state = encoder_outputs.last_hidden_state + encoded_knowledge
+
+        if self.config.include_example:
+            encoded_examples = self.example_encoders(
+                    example_0_input_ids=example_0_input_ids,
+                    example_0_attention_mask=example_0_attention_mask,
+                    example_0_token_type_ids=example_0_token_type_ids,
+                    example_1_input_ids=example_1_input_ids,
+                    example_1_attention_mask=example_1_attention_mask,
+                    example_1_token_type_ids=example_1_token_type_ids,
+                    example_2_input_ids=example_2_input_ids,
+                    example_2_attention_mask=example_2_attention_mask,
+                    example_2_token_type_ids=example_2_token_type_ids,
+                    example_3_input_ids=example_3_input_ids,
+                    example_3_attention_mask=example_3_attention_mask,
+                    example_3_token_type_ids=example_3_token_type_ids,
+                    example_4_input_ids=example_4_input_ids,
+                    example_4_attention_mask=example_4_attention_mask,
+                    example_4_token_type_ids=example_4_token_type_ids,
+                )
+
+            if encoded_examples is not None:
+                last_hidden_state = last_hidden_state + encoded_examples
+
+        encoder_outputs['last_hidden_state'] = self.norm_layer(last_hidden_state)
+        return encoder_outputs
+
     def forward(self,
                 input_ids: Optional[torch.LongTensor] = None,
                 attention_mask: Optional[torch.FloatTensor] = None,
@@ -398,58 +488,40 @@ class TextualResponseGenerator(EncoderDecoderModel):
         }
 
         if encoder_outputs is None:
-            encoder_outputs = self.encode_context(
+            encoder_outputs = self.get_encoder_output(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
-                return_dict=True,
-                **kwargs_encoder
-            )
-            last_hidden_state = encoder_outputs.last_hidden_state
-
-            if self.config.include_knowledge:
-                encoded_knowledge = self.knowledge_encoder(
-                    react_rel_input_ids=react_rel_input_ids,
-                    react_rel_attention_mask=react_rel_attention_mask,
-                    react_rel_token_type_ids=react_rel_token_type_ids,
-                    social_rel_input_ids=social_rel_input_ids,
-                    social_rel_attention_mask=social_rel_attention_mask,
-                    social_rel_token_type_ids=social_rel_token_type_ids,
-                    event_rel_input_ids=event_rel_input_ids,
-                    event_rel_attention_mask=event_rel_attention_mask,
-                    event_rel_token_type_ids=event_rel_token_type_ids,
-                    entity_rel_input_ids=entity_rel_input_ids,
-                    entity_rel_attention_mask=entity_rel_attention_mask,
-                    entity_rel_token_type_ids=entity_rel_token_type_ids
-                )
-
-                last_hidden_state = encoder_outputs.last_hidden_state + encoded_knowledge
-
-            if self.config.include_example:
-                encoded_examples = self.example_encoders(
-                    example_0_input_ids=example_0_input_ids,
-                    example_0_attention_mask=example_0_attention_mask,
-                    example_0_token_type_ids=example_0_token_type_ids,
-                    example_1_input_ids=example_1_input_ids,
-                    example_1_attention_mask=example_1_attention_mask,
-                    example_1_token_type_ids=example_1_token_type_ids,
-                    example_2_input_ids=example_2_input_ids,
-                    example_2_attention_mask=example_2_attention_mask,
-                    example_2_token_type_ids=example_2_token_type_ids,
-                    example_3_input_ids=example_3_input_ids,
-                    example_3_attention_mask=example_3_attention_mask,
-                    example_3_token_type_ids=example_3_token_type_ids,
-                    example_4_input_ids=example_4_input_ids,
-                    example_4_attention_mask=example_4_attention_mask,
-                    example_4_token_type_ids=example_4_token_type_ids,
-                )
-
-                if encoded_examples is not None:
-                    last_hidden_state = last_hidden_state + encoded_examples
-
-            encoder_outputs['last_hidden_state'] = self.norm_layer(last_hidden_state)
+                react_rel_input_ids=react_rel_input_ids,
+                react_rel_attention_mask=react_rel_attention_mask,
+                react_rel_token_type_ids=react_rel_token_type_ids,
+                social_rel_input_ids=social_rel_input_ids,
+                social_rel_attention_mask=social_rel_attention_mask,
+                social_rel_token_type_ids=social_rel_token_type_ids,
+                event_rel_input_ids=event_rel_input_ids,
+                event_rel_attention_mask=event_rel_attention_mask,
+                event_rel_token_type_ids=event_rel_token_type_ids,
+                entity_rel_input_ids=entity_rel_input_ids,
+                entity_rel_attention_mask=entity_rel_attention_mask,
+                entity_rel_token_type_ids=entity_rel_token_type_ids,
+                example_0_input_ids=example_0_input_ids,
+                example_0_attention_mask=example_0_attention_mask,
+                example_0_token_type_ids=example_0_token_type_ids,
+                example_1_input_ids=example_1_input_ids,
+                example_1_attention_mask=example_1_attention_mask,
+                example_1_token_type_ids=example_1_token_type_ids,
+                example_2_input_ids=example_2_input_ids,
+                example_2_attention_mask=example_2_attention_mask,
+                example_2_token_type_ids=example_2_token_type_ids,
+                example_3_input_ids=example_3_input_ids,
+                example_3_attention_mask=example_3_attention_mask,
+                example_3_token_type_ids=example_3_token_type_ids,
+                example_4_input_ids=example_4_input_ids,
+                example_4_attention_mask=example_4_attention_mask,
+                example_4_token_type_ids=example_4_token_type_ids,
+                **kwargs)
 
         elif isinstance(encoder_outputs, tuple):
             encoder_outputs = BaseModelOutput(*encoder_outputs)
@@ -510,6 +582,29 @@ class TextualResponseGenerator(EncoderDecoderModel):
             output[key] = value
 
         return output
+
+    def _prepare_encoder_decoder_kwargs_for_generation(self, inputs_tensor: torch.Tensor,
+                                                       model_kwargs, model_input_name: Optional[str] = None):
+        # if hasattr(self, "hf_device_map"):
+        #     if hasattr(encoder, "_hf_hook"):
+        #         encoder._hf_hook.io_same_device = True
+        #     else:
+        #         add_hook_to_module(encoder, AlignDevicesHook(io_same_device=True))
+
+        # 1. Prepare encoder args and encoder kwargs from model kwargs.
+        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache", 'return_dict', 'labels']
+
+        encoder_kwargs = {
+            argument: value
+            for argument, value in model_kwargs.items()
+            if not any(argument.startswith(p) for p in irrelevant_prefix)
+        }
+
+        # 2. make sure that encoder returns `ModelOutput`
+        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
+        encoder_kwargs[model_input_name] = inputs_tensor
+        model_kwargs["encoder_outputs"] = self.get_encoder_output(**encoder_kwargs)
+        return model_kwargs
 
     def compute_face_loss(self, labels=None, logits=None):
         """
