@@ -27,8 +27,8 @@ class ExampleRetriever:
         count = 10
         while True:
             try:
-                self.CTX_MODEL = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base").cuda()
-                self.QS_MODEL = DPRQuestionEncoder.from_pretrained("facebook/dpr-question_encoder-single-nq-base").cuda()
+                self.CTX_MODEL = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
+                self.QS_MODEL = DPRQuestionEncoder.from_pretrained("facebook/dpr-question_encoder-single-nq-base")
                 self.CTX_TOKENIZER = DPRContextEncoderTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
                 self.QS_TOKENIZER = DPRQuestionEncoderTokenizer.from_pretrained("facebook/dpr-question_encoder-single-nq-base")
                 break
@@ -38,6 +38,11 @@ class ExampleRetriever:
                 if count == 0:
                     raise e
                 time.sleep(1)
+
+        if torch.cuda.is_available():
+            self.CTX_MODEL = self.CTX_MODEL.cuda()
+            self.QS_MODEL = self.QS_MODEL.cuda()
+
         self.QS_TOKENIZER.truncation_side = "left"
 
         self.load_fine_tuned_dpr()

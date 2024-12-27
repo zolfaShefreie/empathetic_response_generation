@@ -244,12 +244,13 @@ class TextCleaner:
         """
         result = dict()
         for each_key in self.texts_key_name:
-            texts = sample[each_key]
+            if each_key in sample.keys():
+                texts = sample[each_key]
 
-            # value of each (row, col) can be list type or str type
-            cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
-                else self._clean_single_text(texts)
-            result[each_key] = cleaned_result
+                # value of each (row, col) can be list type or str type
+                cleaned_result = self._clean_list_of_texts(texts) if isinstance(texts, list) or isinstance(texts, np.ndarray) \
+                    else self._clean_single_text(texts)
+                result[each_key] = cleaned_result
 
         sample.update(result)
         return sample
@@ -841,3 +842,12 @@ class PostProcessResult:
                     result.update({f"{task_name}_result": func_task(pred=pred_task, labels=labels_task)})
 
         return result
+
+
+class AddBatchDimension:
+    """
+    add batch dimension to one sample
+    """
+
+    def __call__(self, sample: dict):
+        return {k: torch.unsqueeze(v, 0) for k, v in sample.items()}

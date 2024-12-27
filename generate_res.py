@@ -4,16 +4,16 @@ from model_data_process.knowledge_generator import KnowledgeGenerator
 from utils.audio_util import AudioModule
 from utils.interface import BaseInterface, str2bool
 from model_data_process.data_model_mapping import MultiModalResponseGeneratorMapping, TextualResponseGeneratorMapping,\
-    EmotionalTextualResponseGeneratorMapping, MultiModelEmotionClassifierMapping
-from utils.callbacks import SaveHistoryCallback
+    EmotionalTextualResponseGeneratorMapping
+from utils.preprocessing import AddBatchDimension
 
-from transformers.trainer_utils import PredictionOutput
+import argparse
 import os
 import json
 import pandas as pd
 
 
-class EvaluateInterface(BaseInterface):
+class ResponseGeneratorInterface(BaseInterface):
     DESCRIPTION = "You can generate a text using response generator models.\n" \
                   "The example of format of conversation is saved in conversation_example.json file.\n" \
                   "Consider:\n1. the number of utterance must be even\n" \
@@ -76,25 +76,24 @@ class EvaluateInterface(BaseInterface):
         return value
 
     def validate_conversation_path(self, value):
-        # to do check it has correct format
-        if value is not None and not os.path.exists(value):
-            return None
+        if value is None or not os.path.exists(value):
+            raise argparse.ArgumentTypeError(f"{value} doesn't exist")
         return value
 
     def get_conversation(self):
 
         def validate_conversation(conversation: list):
             if len(conversation) % 2 != 1:
-                raise Exception("invalid conversation format")
+                raise argparse.ArgumentTypeError("invalid conversation format")
             for utter in conversation:
                 if "utterance" not in utter.keys():
-                    raise Exception("invalid conversation format")
+                    raise argparse.ArgumentTypeError("invalid conversation format")
                 if "audio_file_path" not in utter.keys() and self.model == "BiModalResponseGenerator":
-                    raise Exception("invalid conversation format")
+                    raise argparse.ArgumentTypeError("invalid conversation format")
 
             if self.model == "BiModalResponseGenerator":
                 if conversation[-1]['audio_file_path'] is None or not os.path.exists(conversation[-1]['audio_file_path']):
-                    raise Exception("invalid conversation format")
+                    raise argparse.ArgumentTypeError("invalid conversation format")
 
             return conversation
 
@@ -109,7 +108,7 @@ class EvaluateInterface(BaseInterface):
         with open(self.conversation_path, mode='r', encoding='utf-8') as file:
             content = dict(json.loads(file.read()))
             if 'conversation' not in content.keys():
-                raise Exception("invalid conversation format")
+                raise argparse.ArgumentTypeError("invalid conversation format")
             return new_format_of_conversation(validate_conversation(content['conversation']))
 
     def get_generated_knowledge(self, record):
@@ -140,7 +139,8 @@ class EvaluateInterface(BaseInterface):
 
         record['history_str'] = ", ".join(record['history'])
         record['xReact'] = list(record['social_rel'].values())[0]['xReact']
-        record = example_retriever(record)
+        new_record = {**record, **{'original_conv_id': '-2'}}
+        record = example_retriever(new_record)
         return record
 
     def process_audio(self, record):
@@ -148,6 +148,9 @@ class EvaluateInterface(BaseInterface):
         return record
 
     def get_generation_config(self):
+        if self.generation_config_path is None:
+            return {}
+
         with open(self.generation_config_path, mode='r', encoding='utf-8') as file:
             generation_config = dict(json.loads(file.read()))
             return generation_config
@@ -174,15 +177,16 @@ class EvaluateInterface(BaseInterface):
 
         # preprocess conversation
         preprocessed_conv = config.TRANSFORMS(conversation_record)
+        preprocessed_conv = AddBatchDimension()(preprocessed_conv)
 
         # generate response
         generation_config = self.get_generation_config()
         output = model.generate(**preprocessed_conv, **generation_config)
 
         # post process and print
-        response = config.ConversationTokenizer.target_tokenizer.decode(output[0], skip_special_tokens=True)
+        response = config.CONVERSATION_TOKENIZER.target_tokenizer.decode(output[0], skip_special_tokens=True)
         print(f"Generated Response: {response}")
 
 
 if __name__ == "__main__":
-    EvaluateInterface().run()
+    ResponseGeneratorInterface().run()
