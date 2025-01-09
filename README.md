@@ -32,6 +32,29 @@ python train_model.py --model EmotionalTextualResponseGenerator --number_of_epoc
 ```
 To skip training you can put huggingFace links of trained on .env file.
 
+<table>
+  <tr>
+    <td><b>Model</b></td>
+    <td><b>HuggingFace Link</b></td>
+  </tr>
+  <tr>
+    <td>BiModalResponseGenerator</td>
+    <td>Shefreie/BiModal_empathetic_response_generation</td>
+  </tr>
+  <tr>
+    <td>BiModalEmotionClassifier</td>
+    <td>Shefreie/BiModal_emotion_recognition</td>
+  </tr>
+  <tr>
+    <td>EmotionalTextualResponseGenerator</td>
+    <td>Shefreie/Multi_learning_emp_response_generation_emotion_classification</td>
+  </tr>
+  <tr>
+    <td>TextualResponseGenerator</td>
+    <td>Shefreie/Knowledge_based_examplar_empathetic_response_generation</td>
+  </tr>
+</table>
+
 ### Evaluate Models
 For evaluating with test dataset you can run the "evaluate_model.py" script. 
 ```
