@@ -43,7 +43,6 @@ python evaluate_more.py --model own --result_path {result_path} --dataset_name E
 ```
 
 ### Comunicate With Model
-
 ```
-
+python generate_res.py --model BiModalResponseGenerator --generation_config_path generation_config.json --conversation_path conv.json
 ```
