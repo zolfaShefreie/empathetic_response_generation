@@ -11,6 +11,7 @@ import argparse
 import os
 import json
 import pandas as pd
+import time
 
 
 class ResponseGeneratorInterface(BaseInterface):
@@ -159,7 +160,15 @@ class ResponseGeneratorInterface(BaseInterface):
 
         # conversation process
         conversation_record = self.get_conversation()
-        conversation_record = self.get_examples(self.get_generated_knowledge(conversation_record))
+
+        start_time = time.time()
+        conversation_record = self.get_generated_knowledge(conversation_record)
+        print(f"Knowledge nodes are generated in {time.time() - start_time} seconds")
+
+        start_time = time.time()
+        conversation_record = self.get_examples(conversation_record)
+        print(f"Examples are retrieved in {time.time() - start_time} seconds")
+
         if self.model == "BiModalResponseGenerator":
             conversation_record = self.process_audio(conversation_record)
 
@@ -171,6 +180,7 @@ class ResponseGeneratorInterface(BaseInterface):
         model_class = config.ModelClass
         try:
             model = model_class.from_pretrained(config.hub_args()['hub_model_id'], token=config.hub_args()['hub_token'])
+            print("Model is loaded")
         except Exception:
             raise Exception("there is no pretrained model on HuggingFace")
         model.eval()
@@ -181,7 +191,10 @@ class ResponseGeneratorInterface(BaseInterface):
 
         # generate response
         generation_config = self.get_generation_config()
+
+        start_time = time.time()
         output = model.generate(**preprocessed_conv, **generation_config)
+        print(f"Response is generated in {time.time() - start_time} seconds")
 
         # post process and print
         response = config.CONVERSATION_TOKENIZER.target_tokenizer.decode(output[0], skip_special_tokens=True)
