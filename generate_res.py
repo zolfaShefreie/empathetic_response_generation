@@ -1,3 +1,5 @@
+import torch
+
 from model_data_process.dataset import EmpatheticDialoguesDataset
 from model_data_process.example_retriever import ExampleRetriever
 from model_data_process.knowledge_generator import KnowledgeGenerator
@@ -177,18 +179,20 @@ class ResponseGeneratorInterface(BaseInterface):
                                               include_example=self.include_example,
                                               include_emp_losses=self.include_emp_losses)
 
+        device = 'cpu' if not torch.cuda.is_available() else 'cuda'
         model_class = config.ModelClass
         try:
             model = model_class.from_pretrained(config.hub_args()['hub_model_id'], token=config.hub_args()['hub_token'])
             print("Model is loaded")
         except Exception:
             raise Exception("there is no pretrained model on HuggingFace")
+        model = model.to(device)
         model.eval()
 
         # preprocess conversation
         preprocessed_conv = config.TRANSFORMS(conversation_record)
         preprocessed_conv = AddBatchDimension()(preprocessed_conv)
-
+        preprocessed_conv = {k: v.to(device) for k, v in preprocessed_conv.items()}
         # generate response
         generation_config = self.get_generation_config()
 
